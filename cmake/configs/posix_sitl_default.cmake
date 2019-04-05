@@ -127,6 +127,7 @@ set(config_module_list
 	#
 	# Demo apps
 	#
+	modules/formation_control
 
 	# Tutorial code from
 	# https://px4.io/dev/px4_simple_app
