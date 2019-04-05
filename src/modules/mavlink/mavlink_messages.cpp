@@ -101,6 +101,8 @@
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_magnetometer.h>
+#include <uORB/topics/formationx.h>
+#include <v2.0/custom_messages/mavlink_msg_formationx.h>
 #include <uORB/uORB.h>
 
 using matrix::wrap_2pi;
@@ -4122,6 +4124,70 @@ protected:
 	}
 };
 
+class MavlinkStreamFormationx : public MavlinkStream
+{
+public:
+    const char *get_name() const
+    {
+        return MavlinkStreamFormationx::get_name_static();
+    }
+
+    static const char *get_name_static()
+    {
+        return "FORMATIONX";
+    }
+
+    static uint16_t get_id_static()
+    {
+        return MAVLINK_MSG_ID_FORMATIONX;
+    }
+
+    uint16_t get_id()
+    {
+        return get_id_static();
+    }
+
+    static MavlinkStream *new_instance(Mavlink *mavlink)
+    {
+        return new MavlinkStreamFormationx(mavlink);
+    }
+
+    unsigned get_size()
+    {
+        return MAVLINK_MSG_ID_FORMATIONX_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+    }
+
+private:
+    MavlinkOrbSubscription *_sub;
+
+    uint64_t _formationx_time{0};
+
+    /* do not allow top copying this class */
+    MavlinkStreamFormationx(MavlinkStreamFormationx &) = delete;
+    MavlinkStreamFormationx &operator = (const MavlinkStreamFormationx &) = delete;
+
+protected:
+    explicit MavlinkStreamFormationx(Mavlink *mavlink) : MavlinkStream(mavlink),
+        _sub(_mavlink->add_orb_subscription(ORB_ID(formationx)))
+    {}
+
+    bool send(const hrt_abstime t)
+    {
+        struct formationx_s _formationx;
+        if (_sub->update(&_formationx_time, &_formationx)) {
+
+            __mavlink_formationx_t msg = {};
+            msg.alt=_formationx.alt;
+
+            mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
+//            PX4_INFO("%.1f",double(msg.alt));
+
+        }
+
+        return true;
+    }
+};
+
 static const StreamListItem streams_list[] = {
 	StreamListItem(&MavlinkStreamHeartbeat::new_instance, &MavlinkStreamHeartbeat::get_name_static, &MavlinkStreamHeartbeat::get_id_static),
 	StreamListItem(&MavlinkStreamStatustext::new_instance, &MavlinkStreamStatustext::get_name_static, &MavlinkStreamStatustext::get_id_static),
@@ -4173,7 +4239,8 @@ static const StreamListItem streams_list[] = {
 	StreamListItem(&MavlinkStreamMountOrientation::new_instance, &MavlinkStreamMountOrientation::get_name_static, &MavlinkStreamMountOrientation::get_id_static),
 	StreamListItem(&MavlinkStreamHighLatency2::new_instance, &MavlinkStreamHighLatency2::get_name_static, &MavlinkStreamHighLatency2::get_id_static),
 	StreamListItem(&MavlinkStreamGroundTruth::new_instance, &MavlinkStreamGroundTruth::get_name_static, &MavlinkStreamGroundTruth::get_id_static),
-	StreamListItem(&MavlinkStreamPing::new_instance, &MavlinkStreamPing::get_name_static, &MavlinkStreamPing::get_id_static)
+    StreamListItem(&MavlinkStreamPing::new_instance, &MavlinkStreamPing::get_name_static, &MavlinkStreamPing::get_id_static),
+    StreamListItem(&MavlinkStreamFormationx::new_instance, &MavlinkStreamFormationx::get_name_static, &MavlinkStreamFormationx::get_id_static)
 };
 
 const char *get_stream_name(const uint16_t msg_id)

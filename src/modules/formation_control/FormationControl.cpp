@@ -90,15 +90,12 @@ FormationControl::formationx_sp_publish()
 
 void FormationControl::run()
 {
-
-
-
-
-    PX4_INFO("Hello Sky!");
+    PX4_INFO("Formation Control Run!");
 
     /* 订阅 sensor_combined主题*/
     int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
-    orb_set_interval(sensor_sub_fd, 200);//限制更新频率为5 Hz
+    int vehicle_global_position_sub_fd = orb_subscribe(ORB_ID(vehicle_global_position));
+    orb_set_interval(sensor_sub_fd, 1000);//限制更新频率为1 Hz
 
     /* 1.公告attitude主题 */
     struct vehicle_attitude_s att;
@@ -146,40 +143,34 @@ void FormationControl::run()
                 struct sensor_combined_s raw;
                 orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &raw);
 
+                struct vehicle_global_position_s _mainuav_position;
+                orb_copy(ORB_ID(vehicle_global_position), vehicle_global_position_sub_fd, &_mainuav_position);
+
+                struct sensor_baro_s _mainuav_pressure;
+                orb_copy(ORB_ID(sensor_baro), orb_subscribe(ORB_ID(sensor_baro)), &_mainuav_pressure);
+
+                _formationx_sp.lat = _mainuav_position.lat;
+                _formationx_sp.lon = _mainuav_position.lon;
+                _formationx_sp.alt = _mainuav_pressure.pressure;
 
 
-
-
-
-                _formationx_sp.alt = 5.0;
-
-
-
+//                _formationx_sp.alt = 5.5;
 
                 formationx_sp_publish();
 
-
+           //            mavlink_log_critical(&_mavlink_log_pub, "test = %.1f/n", double(_formationx_sp.alt));
 
 
                 formationx_sp_poll();
 
+//                mavlink_log_critical(&_mavlink_log_pub, "test = %.1f/n", double(_formationx_sp_out.alt));
                 PX4_INFO("test:\t%8.4f",double(_formationx_sp_out.alt));
-
-
             }
+
         }
     }
 
     PX4_INFO("exiting");
-
-
-
-
-
-
-
-
-
 }
 
 

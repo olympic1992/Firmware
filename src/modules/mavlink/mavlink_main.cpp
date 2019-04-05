@@ -2042,6 +2042,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VFR_HUD", 4.0f);
 		configure_stream("VISION_POSITION_ESTIMATE", 1.0f);
 		configure_stream("WIND_COV", 1.0f);
+        configure_stream("FORMATIONX", 1.0f);
 		break;
 
 	case MAVLINK_MODE_ONBOARD:
@@ -2080,6 +2081,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VFR_HUD", 10.0f);
 		configure_stream("VISION_POSITION_ESTIMATE", 10.0f);
 		configure_stream("WIND_COV", 10.0f);
+        configure_stream("FORMATIONX", 1.0f);
 		break;
 
 	case MAVLINK_MODE_OSD:
@@ -2097,6 +2099,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("SYSTEM_TIME", 1.0f);
 		configure_stream("VFR_HUD", 25.0f);
 		configure_stream("WIND_COV", 2.0f);
+        configure_stream("FORMATIONX", 1.0f);
 		break;
 
 	case MAVLINK_MODE_MAGIC:
@@ -2139,6 +2142,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VFR_HUD", 20.0f);
 		configure_stream("VISION_POSITION_ESTIMATE", 10.0f);
 		configure_stream("WIND_COV", 10.0f);
+        configure_stream("FORMATIONX", 10.0f);
 		break;
 
 	case MAVLINK_MODE_IRIDIUM:
@@ -2156,6 +2160,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("RC_CHANNELS", 0.5f);
 		configure_stream("SYS_STATUS", 0.1f);
 		configure_stream("VFR_HUD", 1.0f);
+        configure_stream("FORMATIONX", 10.0f);
 		break;
 
 	default:

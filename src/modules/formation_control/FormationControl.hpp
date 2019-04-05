@@ -56,6 +56,7 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/formationx.h>
+#include <uORB/topics/sensor_baro.h>
 #include <vtol_att_control/vtol_type.h>
 #include <systemlib/mavlink_log.h>
 
