@@ -743,6 +743,11 @@ fi
 		mavlink start -r 800000 -d /dev/ttyACM0 -m config -x
 	fi
 
+
+formation_control start
+
+
+
 	#
 	# Fixed wing setup
 	#

@@ -95,7 +95,7 @@ void FormationControl::run()
     /* 订阅 sensor_combined主题*/
     int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
     int vehicle_global_position_sub_fd = orb_subscribe(ORB_ID(vehicle_global_position));
-    orb_set_interval(sensor_sub_fd, 1000);//限制更新频率为1 Hz
+    orb_set_interval(sensor_sub_fd, 2000);//限制更新频率为1 Hz
 
     /* 1.公告attitude主题 */
     struct vehicle_attitude_s att;
@@ -119,12 +119,12 @@ void FormationControl::run()
 
     while (!should_exit()) {
         /* 等待1000ms获取数据 */
-        int poll_ret = px4_poll(fds, 1, 1000);
+        int poll_ret = px4_poll(fds, 1, 3000);
 
         /* 处理结果*/
         if (poll_ret == 0)  //未得到数据
         {
-            PX4_ERR("Got no data within a second");
+            PX4_ERR("Got no data within 3 second");
         }
         else if (poll_ret < 0)  //严重错误
         {
@@ -149,12 +149,12 @@ void FormationControl::run()
                 struct sensor_baro_s _mainuav_pressure;
                 orb_copy(ORB_ID(sensor_baro), orb_subscribe(ORB_ID(sensor_baro)), &_mainuav_pressure);
 
-                _formationx_sp.lat = _mainuav_position.lat;
-                _formationx_sp.lon = _mainuav_position.lon;
-                _formationx_sp.alt = _mainuav_pressure.pressure;
+//                _formationx_sp.lat = _mainuav_position.lat;
+//                _formationx_sp.lon = _mainuav_position.lon;
+//                _formationx_sp.alt = _mainuav_position.alt;
 
 
-//                _formationx_sp.alt = 5.5;
+//                _formationx_sp.alt = hrt_absolute_time();
 
                 formationx_sp_publish();
 
@@ -163,8 +163,12 @@ void FormationControl::run()
 
                 formationx_sp_poll();
 
-//                mavlink_log_critical(&_mavlink_log_pub, "test = %.1f/n", double(_formationx_sp_out.alt));
-                PX4_INFO("test:\t%8.4f",double(_formationx_sp_out.alt));
+//                mavlink_log_critical(&_mavlink_log_pub, "test = %9.4f/n", double(_formationx_sp_out.alt_rec));
+//                 PX4_INFO("uorb_out :\t%8.4f",double(_formationx_sp_out.alt));
+//                 PX4_INFO("receiver :\t%8.4f",double(_formationx_sp.alt_rec));
+
+
+
             }
 
         }

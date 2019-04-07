@@ -102,7 +102,7 @@
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/formationx.h>
-#include <v2.0/custom_messages/mavlink_msg_formationx.h>
+//#include <v2.0/custom_messages/mavlink_msg_formationx.h>
 #include <uORB/uORB.h>
 
 using matrix::wrap_2pi;
@@ -4158,9 +4158,7 @@ public:
     }
 
 private:
-    MavlinkOrbSubscription *_sub;
-
-    uint64_t _formationx_time{0};
+    uint32_t _sequence;
 
     /* do not allow top copying this class */
     MavlinkStreamFormationx(MavlinkStreamFormationx &) = delete;
@@ -4168,21 +4166,19 @@ private:
 
 protected:
     explicit MavlinkStreamFormationx(Mavlink *mavlink) : MavlinkStream(mavlink),
-        _sub(_mavlink->add_orb_subscription(ORB_ID(formationx)))
+        _sequence(0)
     {}
 
     bool send(const hrt_abstime t)
     {
-        struct formationx_s _formationx;
-        if (_sub->update(&_formationx_time, &_formationx)) {
+        mavlink_formationx_t msg = {};
 
-            __mavlink_formationx_t msg = {};
-            msg.alt=_formationx.alt;
+        msg.time_usec = hrt_absolute_time();
+        msg.seq = _sequence++;
+        msg.target_system = 0; // All systems
+        msg.target_component = 0; // All components
 
-            mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
-//            PX4_INFO("%.1f",double(msg.alt));
-
-        }
+        mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
 
         return true;
     }

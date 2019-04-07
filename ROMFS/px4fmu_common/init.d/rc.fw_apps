@@ -22,7 +22,7 @@ ekf2 start
 fw_att_control start
 fw_pos_control_l1 start
 
-formation_control start
+
 
 #
 # Start Land Detector

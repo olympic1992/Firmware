@@ -3426,6 +3426,7 @@ set_control_mode()
 
 	switch (status.nav_state) {
 	case vehicle_status_s::NAVIGATION_STATE_MANUAL:
+//        PX4_INFO("MANUAL 模式开启!");
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_rates_enabled = stabilization_required();
@@ -3440,6 +3441,7 @@ set_control_mode()
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_STAB:
+        PX4_INFO("STAB 模式开启!");
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_rates_enabled = true;
@@ -3581,6 +3583,7 @@ set_control_mode()
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
+        PX4_INFO("offboard 模式开启!");
 		control_mode.flag_control_manual_enabled = false;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_offboard_enabled = true;

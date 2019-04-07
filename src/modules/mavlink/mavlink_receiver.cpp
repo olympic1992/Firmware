@@ -289,8 +289,9 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		break;
 
 	case MAVLINK_MSG_ID_HEARTBEAT:
+//        PX4_INFO("收到heartbeat");
 		handle_message_heartbeat(msg);
-		break;
+        break;
 
 	case MAVLINK_MSG_ID_DISTANCE_SENSOR:
 		handle_message_distance_sensor(msg);
@@ -347,6 +348,11 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 	case MAVLINK_MSG_ID_DEBUG_VECT:
 		handle_message_debug_vect(msg);
 		break;
+
+    case MAVLINK_MSG_ID_FORMATIONX:
+        PX4_INFO("收到主机编队信息");
+        handle_message_formationx(msg);
+        break;
 
 	default:
 		break;
@@ -1145,6 +1151,7 @@ MavlinkReceiver::handle_message_gps_global_origin(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_attitude_quaternion_cov(mavlink_message_t *msg)
 {
+    PX4_INFO("收到attitude_quaternion_cov ");
 	mavlink_attitude_quaternion_cov_t att;
 	mavlink_msg_attitude_quaternion_cov_decode(msg, &att);
 
@@ -1429,12 +1436,17 @@ MavlinkReceiver::handle_message_radio_status(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
 {
+
 	mavlink_ping_t ping;
 	mavlink_msg_ping_decode(msg, &ping);
+
+
+
 
 	if ((ping.target_system == 0) &&
 	    (ping.target_component == 0)) {	   // This is a ping request. Return it to the system which requested the ping.
 
+        PX4_INFO("其他系统的PING请求 %d, %d, %d,",msg->sysid,msg->compid,msg->msgid);
 		ping.target_system = msg->sysid;
 		ping.target_component = msg->compid;
 		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &ping);
@@ -1443,6 +1455,7 @@ MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
 		   (ping.target_component ==
 		    mavlink_system.compid)) {	// This is a returned ping message from this system. Calculate latency from it.
 
+        PX4_INFO("回应本系统的PING %d, %d, %d,",msg->sysid,msg->compid,msg->msgid);
 		const hrt_abstime now = hrt_absolute_time();
 
 		// Calculate round trip time
@@ -1819,8 +1832,11 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 		mavlink_heartbeat_t hb;
 		mavlink_msg_heartbeat_decode(msg, &hb);
 
+//        PX4_INFO("收到heartbeat %d, %d,",msg->sysid,hb.type);
+
 		/* ignore own heartbeats, accept only heartbeats from GCS */
 		if (msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) {
+            PX4_INFO("收到地面站的心跳包! %d, %d,",mavlink_system.sysid,hb.type);
 
 			struct telemetry_status_s &tstatus = _mavlink->get_rx_status();
 
@@ -2195,6 +2211,7 @@ void MavlinkReceiver::handle_message_collision(mavlink_message_t *msg)
 
 void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg)
 {
+    PX4_INFO("收到gps_rtcm_data");
 	mavlink_gps_rtcm_data_t gps_rtcm_data_msg = {};
 	mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
 
@@ -2449,6 +2466,29 @@ void MavlinkReceiver::handle_message_debug_vect(mavlink_message_t *msg)
 	} else {
 		orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &debug_topic);
 	}
+}
+
+void
+MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
+{
+    PX4_INFO("收到主机编队信息");
+//    mavlink_formationx_t formx;
+//    mavlink_msg_formationx_decode(msg, &formx);
+
+//    struct formationx_s f;
+//    memset(&f, 0, sizeof(f));
+
+//    f.timestamp = hrt_absolute_time();
+//    f.lat_rec = formx.lat;
+//    f.lon_rec = formx.lon;
+//    f.alt_rec = formx.alt;
+
+//    if (_formationx_pub == nullptr) {
+//        _formationx_pub = orb_advertise(ORB_ID(formationx), &f);
+
+//    } else {
+//        orb_publish(ORB_ID(formationx), _formationx_pub, &f);
+//    }
 }
 
 /**
