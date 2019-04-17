@@ -4158,6 +4158,7 @@ public:
     }
 
 private:
+    MavlinkOrbSubscription *_formationx_sub;
     uint32_t _sequence;
 
     /* do not allow top copying this class */
@@ -4166,21 +4167,41 @@ private:
 
 protected:
     explicit MavlinkStreamFormationx(Mavlink *mavlink) : MavlinkStream(mavlink),
+        _formationx_sub(_mavlink->add_orb_subscription(ORB_ID(formationx))),
         _sequence(0)
     {}
 
-    bool send(const hrt_abstime t)
+    bool send(const hrt_abstime t)       
     {
-        mavlink_formationx_t msg = {};
+        bool updated = false;
+        struct formationx_s formuorb  = {};
+        if (_formationx_sub->update(&formuorb)) {
+            updated = true;
 
-        msg.time_usec = hrt_absolute_time();
-        msg.seq = _sequence++;
-        msg.target_system = 0; // All systems
-        msg.target_component = 0; // All components
+            mavlink_formationx_t msg = {};
 
-        mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
+            // 数据来自uorb主题,然后发送到mavlink总线上.
 
-        return true;
+            msg.time_usec = hrt_absolute_time();
+            msg.seq = _sequence++;
+            msg.target_system = 0; // All systems
+            msg.target_component = 0; // All components
+
+            msg.lat=formuorb.lat;
+            msg.lon=formuorb.lon;
+            msg.alt=formuorb.alt;
+
+            msg.vx=formuorb.vx;
+            msg.vy=formuorb.vy;
+            msg.vz=formuorb.vz;
+
+            if (updated) {
+                mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
+                printf("发送 编队 mavlink消息 \n");
+            }
+            return updated;
+        }
+        return false;
     }
 };
 

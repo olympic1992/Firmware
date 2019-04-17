@@ -55,6 +55,7 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/formationrec.h>
 #include <uORB/topics/formationx.h>
 #include <uORB/topics/sensor_baro.h>
 #include <vtol_att_control/vtol_type.h>
@@ -92,18 +93,18 @@ public:
 
 private:
 
-    int     _formationx_sp_sub{-1};
+    int     _formationrec_sub{-1};
 
-    orb_advert_t	_formationx_sp_pub{nullptr};			/**<  */
+    orb_advert_t	_mainuavformcmdorb_pub{nullptr};			/**<  */
 
     orb_advert_t	_mavlink_log_pub{nullptr};
 
 
-    orb_id_t _formationx_sp_id{nullptr};
+    orb_id_t _mainuavformcmdorb_id{nullptr};
 
 
-    formationx_s                _formationx_sp {}; /*自定义的编队控制结构体 */
-    formationx_s                _formationx_sp_out {}; /*输出用的 */
+    formationx_s                _mainuavformcmdorb {}; /*自定义的编队控制结构体 */
+    formationrec_s               _formationrec {}; /*自定义的编队控制结构体 */
 
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */

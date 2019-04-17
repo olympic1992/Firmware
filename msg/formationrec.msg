@@ -1,4 +1,5 @@
-# 主机位置
+# 从机收到的信息,原则上内容和formationx一样
+
 float64 lat			# target position (deg * 1e7)
 float64 lon			# target position (deg * 1e7) 
 float32 alt			# target position

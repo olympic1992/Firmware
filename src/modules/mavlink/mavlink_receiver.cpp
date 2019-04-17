@@ -2472,23 +2472,25 @@ void
 MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
 {
     PX4_INFO("收到主机编队信息");
-//    mavlink_formationx_t formx;
-//    mavlink_msg_formationx_decode(msg, &formx);
 
-//    struct formationx_s f;
-//    memset(&f, 0, sizeof(f));
+//    将mavlink总线上的消息解码为msg,然后赋值给uorb消息,并且发送到uorb总线上
+    mavlink_formationx_t formx_rec;
+    mavlink_msg_formationx_decode(msg, &formx_rec);
 
-//    f.timestamp = hrt_absolute_time();
-//    f.lat_rec = formx.lat;
-//    f.lon_rec = formx.lon;
-//    f.alt_rec = formx.alt;
+    struct formationrec_s f;
+    memset(&f, 0, sizeof(f));
 
-//    if (_formationx_pub == nullptr) {
-//        _formationx_pub = orb_advertise(ORB_ID(formationx), &f);
+    f.timestamp = hrt_absolute_time();
+    f.lat = formx_rec.lat;
+    f.lon = formx_rec.lon;
+    f.alt = formx_rec.alt;
 
-//    } else {
-//        orb_publish(ORB_ID(formationx), _formationx_pub, &f);
-//    }
+    if (_formationrec_pub == nullptr) {
+        _formationrec_pub = orb_advertise(ORB_ID(formationrec), &f);
+
+    } else {
+        orb_publish(ORB_ID(formationrec), _formationrec_pub, &f);
+    }
 }
 
 /**
@@ -2619,6 +2621,8 @@ MavlinkReceiver::receive_thread(void *arg)
 							/* this will only switch to proto version 2 if allowed in settings */
 							_mavlink->set_proto_version(2);
 						}
+
+//                        PX4_INFO("msg.msgid : %d",msg.msgid);
 
 						/* handle generic messages and commands */
 						handle_message(&msg);
