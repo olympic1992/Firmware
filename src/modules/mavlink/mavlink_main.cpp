@@ -607,11 +607,11 @@ void Mavlink::mavlink_update_system()
 	 * after reboot - not during operation */
 	if (!_param_initialized) {
 		if (system_id > 0 && system_id < 255) {
-			mavlink_system.sysid = system_id;
+            mavlink_system.sysid = system_id;
 		}
 
 		if (component_id > 0 && component_id < 255) {
-			mavlink_system.compid = component_id;
+            mavlink_system.compid = component_id;
 		}
 
 		_param_initialized = true;
@@ -2016,7 +2016,8 @@ Mavlink::task_main(int argc, char *argv[])
 
 	switch (_mode) {
 	case MAVLINK_MODE_NORMAL:
-        configure_stream("FORMATIONX", 1.0f);
+        printf("MAVLINK_MODE_NORMAL \n");
+        configure_stream("FORMATIONX", 50.0f);
         configure_stream("ADSB_VEHICLE");
         configure_stream("ALTITUDE", 1.0f);
         configure_stream("ATTITUDE", 20.0f);
@@ -2048,7 +2049,8 @@ Mavlink::task_main(int argc, char *argv[])
         break;
 
 	case MAVLINK_MODE_ONBOARD:
-        configure_stream("FORMATIONX", 1.0f);
+        printf("MAVLINK_MODE_ONBOARD \n");
+        configure_stream("FORMATIONX", 50.0f);
         configure_stream("ACTUATOR_CONTROL_TARGET0", 10.0f);
         configure_stream("ADSB_VEHICLE");
         configure_stream("ALTITUDE", 10.0f);
@@ -2087,7 +2089,8 @@ Mavlink::task_main(int argc, char *argv[])
         break;
 
 	case MAVLINK_MODE_OSD:
-        configure_stream("FORMATIONX", 1.0f);
+        printf("MAVLINK_MODE_OSD \n");
+        configure_stream("FORMATIONX", 50.0f);
         configure_stream("ALTITUDE", 1.0f);
         configure_stream("ATTITUDE", 25.0f);
         configure_stream("ATTITUDE_TARGET", 10.0f);
@@ -2109,8 +2112,9 @@ Mavlink::task_main(int argc, char *argv[])
 		break;
 
 	case MAVLINK_MODE_CONFIG:
+        printf("MAVLINK_MODE_CONFIG \n");
 		// Enable a number of interesting streams we want via USB
-        configure_stream("FORMATIONX", 1.0f);
+        configure_stream("FORMATIONX", 50.0f);
         configure_stream("ACTUATOR_CONTROL_TARGET0", 30.0f);
         configure_stream("ADSB_VEHICLE");
         configure_stream("ALTITUDE", 10.0f);
@@ -2152,7 +2156,8 @@ Mavlink::task_main(int argc, char *argv[])
 		break;
 
 	case MAVLINK_MODE_MINIMAL:
-        configure_stream("FORMATIONX", 1.0f);
+        printf("MAVLINK_MODE_MINIMAL \n");
+        configure_stream("FORMATIONX", 50.0f);
         configure_stream("ALTITUDE", 0.5f);
         configure_stream("ATTITUDE", 10.0f);
         configure_stream("EXTENDED_SYS_STATE", 0.1f);

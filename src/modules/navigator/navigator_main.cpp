@@ -703,6 +703,9 @@ Navigator::run()
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET:
 			_pos_sp_triplet_published_invalid_once = false;
 			navigation_mode_new = &_follow_target;
+
+//            printf("显示navigation_mode_new  updated _follow_target \n");
+
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_MANUAL:
@@ -761,6 +764,7 @@ Navigator::run()
 			reset_triplets();
 		}
 
+        //在这里定期更新飞机的位置设置点
 		if (_pos_sp_triplet_updated) {
 			_pos_sp_triplet.timestamp = hrt_absolute_time();
 			publish_position_setpoint_triplet();

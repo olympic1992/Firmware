@@ -604,7 +604,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		return false;
 	}
 
-	/* result of the command */
+    /* result of the command */
 	unsigned cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
 
 	/* request to set different system mode */
@@ -3511,6 +3511,9 @@ set_control_mode()
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
+
+        PX4_INFO("fallthrough 模式开启!");
+
 		control_mode.flag_control_manual_enabled = false;
 		control_mode.flag_control_auto_enabled = true;
 		control_mode.flag_control_rates_enabled = true;

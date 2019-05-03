@@ -291,7 +291,7 @@ main_state_transition(const vehicle_status_s &status, const main_state_t new_mai
 	case commander_state_s::MAIN_STATE_AUTO_FOLLOW_TARGET:
 
 		/* FOLLOW only implemented in MC */
-		if (status.is_rotary_wing) {
+        if (status.is_rotary_wing || status.system_type == 1) {
 			ret = TRANSITION_CHANGED;
 		}
 

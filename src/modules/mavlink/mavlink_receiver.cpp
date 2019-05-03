@@ -119,6 +119,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_baro_pub(nullptr),
 	_airspeed_pub(nullptr),
 	_battery_pub(nullptr),
+    _formationrec_pub(nullptr),
 	_cmd_pub(nullptr),
 	_flow_pub(nullptr),
 	_hil_distance_sensor_pub(nullptr),
@@ -350,7 +351,7 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		break;
 
     case MAVLINK_MSG_ID_FORMATIONX:
-        PX4_INFO("收到主机编队信息");
+//        PX4_INFO("收到主机编队信息");
         handle_message_formationx(msg);
         break;
 
@@ -1836,7 +1837,7 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 
 		/* ignore own heartbeats, accept only heartbeats from GCS */
 		if (msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) {
-            PX4_INFO("收到地面站的心跳包! %d, %d,",mavlink_system.sysid,hb.type);
+//            PX4_INFO("收到地面站的心跳包! %d, %d,",mavlink_system.sysid,hb.type);
 
 			struct telemetry_status_s &tstatus = _mavlink->get_rx_status();
 
@@ -2097,23 +2098,24 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 
 void MavlinkReceiver::handle_message_follow_target(mavlink_message_t *msg)
 {
-	mavlink_follow_target_t follow_target_msg;
-	follow_target_s follow_target_topic = {};
+    //这部分程序用来接收来自mavlink的followtarget消息,不使用这部分,屏蔽功能
+//	mavlink_follow_target_t follow_target_msg;
+//	follow_target_s follow_target_topic = {};
 
-	mavlink_msg_follow_target_decode(msg, &follow_target_msg);
+//	mavlink_msg_follow_target_decode(msg, &follow_target_msg);
 
-	follow_target_topic.timestamp = hrt_absolute_time();
+//	follow_target_topic.timestamp = hrt_absolute_time();
 
-	follow_target_topic.lat = follow_target_msg.lat * 1e-7;
-	follow_target_topic.lon = follow_target_msg.lon * 1e-7;
-	follow_target_topic.alt = follow_target_msg.alt;
+//	follow_target_topic.lat = follow_target_msg.lat * 1e-7;
+//	follow_target_topic.lon = follow_target_msg.lon * 1e-7;
+//	follow_target_topic.alt = follow_target_msg.alt;
 
-	if (_follow_target_pub == nullptr) {
-		_follow_target_pub = orb_advertise(ORB_ID(follow_target), &follow_target_topic);
+//	if (_follow_target_pub == nullptr) {
+//		_follow_target_pub = orb_advertise(ORB_ID(follow_target), &follow_target_topic);
 
-	} else {
-		orb_publish(ORB_ID(follow_target), _follow_target_pub, &follow_target_topic);
-	}
+//	} else {
+//		orb_publish(ORB_ID(follow_target), _follow_target_pub, &follow_target_topic);
+//	}
 }
 
 void MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
@@ -2471,25 +2473,39 @@ void MavlinkReceiver::handle_message_debug_vect(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
 {
-    PX4_INFO("收到主机编队信息");
+//    PX4_INFO("收到主机编队信息");
 
 //    将mavlink总线上的消息解码为msg,然后赋值给uorb消息,并且发送到uorb总线上
     mavlink_formationx_t formx_rec;
     mavlink_msg_formationx_decode(msg, &formx_rec);
+    struct formationrec_s temp;
 
-    struct formationrec_s f;
-    memset(&f, 0, sizeof(f));
+    temp.timestamp = hrt_absolute_time();
+//    temp.timestamp = formx_rec.time_usec;
 
-    f.timestamp = hrt_absolute_time();
-    f.lat = formx_rec.lat;
-    f.lon = formx_rec.lon;
-    f.alt = formx_rec.alt;
+    temp.lat = formx_rec.lat;
+    temp.lon = formx_rec.lon;
+    temp.alt = formx_rec.alt;
 
-    if (_formationrec_pub == nullptr) {
-        _formationrec_pub = orb_advertise(ORB_ID(formationrec), &f);
+
+
+    temp.pitch_body = formx_rec.pitch_body;
+    temp.roll_body  = formx_rec.roll_body;
+    temp.yaw_body   = formx_rec.yaw_body;
+
+
+
+    if (_formationrec_pub != nullptr) {
+
+        printf("收到&上传主机编队信息....temp.timestamp  :  %.1f \n", 1.0 * temp.timestamp);
+
+        orb_publish(ORB_ID(formationrec), _formationrec_pub, &temp);
+
 
     } else {
-        orb_publish(ORB_ID(formationrec), _formationrec_pub, &f);
+
+        _formationrec_pub = orb_advertise(ORB_ID(formationrec), &temp);
+
     }
 }
 

@@ -493,7 +493,7 @@ FixedwingPositionControl::calculate_target_airspeed(float airspeed_demand)
 void
 FixedwingPositionControl::calculate_gndspeed_undershoot(const Vector2f &curr_pos,
 		const Vector2f &ground_speed,
-		const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
+        const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
 	if (pos_sp_curr.valid && !_l1_control.circle_mode()) {
 		/* rotate ground speed vector with current attitude */
@@ -687,6 +687,8 @@ bool
 FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vector2f &ground_speed,
 		const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
+
+//    PX4_INFO("control_position 正在运行");  //调试语句
 	float dt = 0.01f;
 
 	if (_control_position_last_called > 0) {
@@ -711,6 +713,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 	// l1 navigation logic breaks down when wind speed exceeds max airspeed
 	// compute 2D groundspeed from airspeed-heading projection
 	Vector2f air_speed_2d{_airspeed * cosf(_yaw), _airspeed * sinf(_yaw)};
+
+//        Vector2f wind_speed_2d = ground_speed - air_speed_2d;
+
+
 	Vector2f nav_speed_2d{0.0f, 0.0f};
 
 	// angle between air_speed_2d and ground_speed
@@ -802,6 +808,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 			mission_throttle = pos_sp_curr.cruising_throttle;
 		}
 
+//       PX4_INFO("pos_sp_curr.type = %.1f",1.0 * pos_sp_curr.type); //调试语句
+
 		if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
 			_att_sp.thrust = 0.0f;
 			_att_sp.roll_body = 0.0f;
@@ -809,7 +817,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
 			/* waypoint is a plain navigation waypoint */
-			_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
+            _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
 			_att_sp.roll_body = _l1_control.nav_roll();
 			_att_sp.yaw_body = _l1_control.nav_bearing();
 
@@ -822,6 +830,37 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 						   mission_throttle,
 						   false,
 						   radians(_parameters.pitch_limit_min));
+        } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET) {  //这里是自定义的语句,增加的follow_target模式
+
+            PX4_INFO("执行FOLLOW_TARGET位置运算程序 !");
+
+            _l1_control.navigate_followme(prev_wp, curr_wp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
+            _att_sp.roll_body = _l1_control.nav_roll();
+            _att_sp.yaw_body = _l1_control.nav_bearing();
+
+
+            //计算目标空速
+            Vector2f ground_speed_sp{pos_sp_curr.vx,pos_sp_curr.vy}; //获得目标地速
+//            Vector2f follow_airspeed_sp = ground_speed_sp-wind_speed_2d; //目标风速矢量 = 目标地速 - 风速
+                        Vector2f follow_airspeed_sp = ground_speed_sp; //目标风速矢量 = 目标地速
+            float follow_airspeed(0);
+            if(pos_sp_curr.velocity_valid){
+//                follow_airspeed = follow_airspeed_sp.length(); //风速标量
+                follow_airspeed = follow_airspeed_sp(0); //风速标量,仅使用纵向的速度,不使用横向速度
+            } else {
+                follow_airspeed = _parameters.airspeed_trim;
+            }
+
+
+            tecs_update_pitch_throttle(pos_sp_curr.alt,
+                           calculate_target_airspeed(follow_airspeed), //使用目标航点的速度作为跟随速度
+                           radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
+                           radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
+                           _parameters.throttle_min,
+                           _parameters.throttle_max,
+                           mission_throttle,
+                           false,
+                           radians(_parameters.pitch_limit_min));
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
 
@@ -1633,6 +1672,7 @@ FixedwingPositionControl::run()
 		/* wait for up to 500ms for data */
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
+
 		/* timed out - periodic check for _task_should_exit, etc. */
 		if (pret == 0) {
 			continue;
@@ -1657,8 +1697,14 @@ FixedwingPositionControl::run()
 			parameters_update();
 		}
 
+
+
 		/* only run controller if position changed */
-		if ((fds[0].revents & POLLIN) != 0) {
+        if ((fds[0].revents & POLLIN) != 0) {
+
+
+
+//            PX4_INFO("only run controller if position changed 位置控制"); //调试语句
 			perf_begin(_loop_perf);
 
 			/* load local copies */

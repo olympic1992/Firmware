@@ -80,8 +80,8 @@
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/formationrec.h>
 #include <uORB/topics/formationx.h>
+#include <uORB/topics/formationrec.h>
 
 #include "mavlink_ftp.h"
 #include "mavlink_log_handler.h"
@@ -209,8 +209,10 @@ private:
 	struct vehicle_land_detected_s _hil_land_detector;
 	struct vehicle_control_mode_s _control_mode;
 
-    orb_advert_t _formationrec_pub;
-    orb_advert_t _formationx_pub;
+
+
+
+//    orb_advert_t _formationx_pub;
 
 	orb_advert_t _global_pos_pub;
 	orb_advert_t _local_pos_pub;
@@ -222,12 +224,13 @@ private:
 	orb_advert_t _baro_pub;
 	orb_advert_t _airspeed_pub;
 	orb_advert_t _battery_pub;
+    orb_advert_t _formationrec_pub;
 	orb_advert_t _cmd_pub;
 	orb_advert_t _flow_pub;
 	orb_advert_t _hil_distance_sensor_pub;
 	orb_advert_t _flow_distance_sensor_pub;
 	orb_advert_t _distance_sensor_pub;
-	orb_advert_t _offboard_control_mode_pub;
+    orb_advert_t _offboard_control_mode_pub;
 	orb_advert_t _actuator_controls_pub;
 	orb_advert_t _att_sp_pub;
 	orb_advert_t _rates_sp_pub;
@@ -259,7 +262,7 @@ private:
 	bool _hil_local_proj_inited;
 	float _hil_local_alt0;
 	struct map_projection_reference_s _hil_local_proj_ref;
-	struct offboard_control_mode_s _offboard_control_mode;
+    struct offboard_control_mode_s _offboard_control_mode;
 	int	_orb_class_instance;
 
 	static constexpr unsigned MOM_SWITCH_COUNT = 8;

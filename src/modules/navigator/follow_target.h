@@ -63,10 +63,10 @@ public:
 private:
 
 	static constexpr int TARGET_TIMEOUT_MS = 2500;
-	static constexpr int TARGET_ACCEPTANCE_RADIUS_M = 5;
+    static constexpr int TARGET_ACCEPTANCE_RADIUS_M = 20;  //从机对目标位置的跟踪范围,距离小于此值时,认为飞机进圈,会切换跟踪模式
 	static constexpr int INTERPOLATION_PNTS = 20;
-	static constexpr float FF_K = .25F;
-	static constexpr float OFFSET_M = 8;
+    static constexpr float FF_K = .5F;
+    static constexpr float OFFSET_M = 15;
 
 	enum FollowTargetState {
 		TRACK_POSITION,
@@ -82,7 +82,7 @@ private:
 		FOLLOW_FROM_LEFT
 	};
 
-	static constexpr float _follow_position_matricies[4][9] = {
+    static constexpr float _follow_position_matricies[4][9] = {      //从机相对主机位置的矩阵集合
 		{ 1.0F, -1.0F, 0.0F,  1.0F,  1.0F, 0.0F, 0.0F, 0.0F, 1.0F}, // follow right
 		{-1.0F,  0.0F, 0.0F,  0.0F, -1.0F, 0.0F, 0.0F, 0.0F, 1.0F}, // follow behind
 		{ 1.0F,  0.0F, 0.0F,  0.0F,  1.0F, 0.0F, 0.0F, 0.0F, 1.0F}, // follow front
@@ -101,21 +101,21 @@ private:
 
 	int _follow_target_sub{-1};
 	float _step_time_in_ms{0.0f};
-	float _follow_offset{OFFSET_M};
+    float _follow_offset{OFFSET_M};  //从机跟踪目标到主机的距离
 
 	uint64_t _target_updates{0};
 	uint64_t _last_update_time{0};
 
 	matrix::Vector3f _current_vel;
 	matrix::Vector3f _step_vel;
-	matrix::Vector3f _est_target_vel;
-	matrix::Vector3f _target_distance;
-	matrix::Vector3f _target_position_offset;
-	matrix::Vector3f _target_position_delta;
+    matrix::Vector3f _est_target_vel;  //主机在dt时间中的速度向量
+    matrix::Vector3f _target_distance; //从机实际位置到主机的位置向量
+    matrix::Vector3f _target_position_offset; //从机目标位置到主机位置的位置向量
+    matrix::Vector3f _target_position_delta;   //主机在dt时间中的位移向量
 	matrix::Vector3f _filtered_target_position_delta;
 
-	follow_target_s _current_target_motion{};
-	follow_target_s _previous_target_motion{};
+    follow_target_s _current_target_motion{};  //主机的当前坐标位置
+    follow_target_s _previous_target_motion{}; //主机的上一个有效坐标位置
 
 	float _yaw_rate{0.0f};
 	float _responsiveness{0.0f};
@@ -129,7 +129,7 @@ private:
 		ATT_RATES = 3
 	};
 
-	matrix::Dcmf _rot_matrix;
+    matrix::Dcmf _rot_matrix;  //表示从机在主机周围的相对位置矩阵
 
 	void track_target_position();
 	void track_target_velocity();

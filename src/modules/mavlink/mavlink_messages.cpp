@@ -4174,7 +4174,7 @@ protected:
     bool send(const hrt_abstime t)       
     {
         bool updated = false;
-        struct formationx_s formuorb  = {};
+        struct formationx_s formuorb;
         if (_formationx_sub->update(&formuorb)) {
             updated = true;
 
@@ -4182,7 +4182,11 @@ protected:
 
             // 数据来自uorb主题,然后发送到mavlink总线上.
 
-            msg.time_usec = hrt_absolute_time();
+            msg.time_usec = formuorb.timestamp;//    hrt_absolute_time();
+//            msg.time_usec = 1234567;
+
+
+
             msg.seq = _sequence++;
             msg.target_system = 0; // All systems
             msg.target_component = 0; // All components
@@ -4191,13 +4195,26 @@ protected:
             msg.lon=formuorb.lon;
             msg.alt=formuorb.alt;
 
+            msg.roll_body  =formuorb.roll_body;
+            msg.pitch_body =formuorb.pitch_body;
+            msg.yaw_body   =formuorb.yaw_body;
+
+//            printf("测试数据 msg.alt = %.3f \n",(double)msg.alt);
+//            printf("测试数据 msg.roll_body = %.3f \n",(double)msg.roll_body);
+
             msg.vx=formuorb.vx;
             msg.vy=formuorb.vy;
             msg.vz=formuorb.vz;
 
+
+
+            printf("发送 msg.time_usec = %.1f \n",1.0 * msg.time_usec);
+            printf("发送 msg._sequence = %d \n",msg.seq);
+//                printf("测试数据 msg.lat = %.4f \n",(double)msg.lat);
+
+
             if (updated) {
                 mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
-                printf("发送 编队 mavlink消息 \n");
             }
             return updated;
         }

@@ -66,15 +66,18 @@ MissionBlock::is_mission_item_reached()
 {
 	/* handle non-navigation or indefinite waypoints */
 
+
 	switch (_mission_item.nav_cmd) {
 	case NAV_CMD_DO_SET_SERVO:
 		return true;
 
 	case NAV_CMD_LAND: /* fall through */
 	case NAV_CMD_VTOL_LAND:
+        printf("现在是降落状态 \n"); //调试语句注意删除
 		return _navigator->get_land_detected()->landed;
 
 	case NAV_CMD_IDLE: /* fall through */
+        printf("怠速状态 \n"); //调试语句注意删除
 	case NAV_CMD_LOITER_UNLIMITED:
 		return false;
 
@@ -119,6 +122,7 @@ MissionBlock::is_mission_item_reached()
 
 	default:
 		/* do nothing, this is a 3D waypoint */
+        printf("显示 do nothing, this is a 3D waypoint ");
 		break;
 	}
 
