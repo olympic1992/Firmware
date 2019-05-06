@@ -2480,8 +2480,7 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
     mavlink_msg_formationx_decode(msg, &formx_rec);
     struct formationrec_s temp;
 
-    temp.timestamp = hrt_absolute_time();
-//    temp.timestamp = formx_rec.time_usec;
+    temp.timestamp = formx_rec.time_usec;
 
     temp.lat = formx_rec.lat;
     temp.lon = formx_rec.lon;
@@ -2489,15 +2488,18 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
 
 
 
-    temp.pitch_body = formx_rec.pitch_body;
-    temp.roll_body  = formx_rec.roll_body;
-    temp.yaw_body   = formx_rec.yaw_body;
+    temp.vx = formx_rec.vx;
+    temp.vy = formx_rec.vy;
+    temp.vz = formx_rec.vz;
+
+//    temp.yaw_body = formx_rec.yaw_body;
+
 
 
 
     if (_formationrec_pub != nullptr) {
 
-        printf("收到&上传主机编队信息....temp.timestamp  :  %.1f \n", 1.0 * temp.timestamp);
+//        printf("收到&上传主机编队信息....temp.timestamp  :  %.1f \n", 1.0 * temp.timestamp);
 
         orb_publish(ORB_ID(formationrec), _formationrec_pub, &temp);
 

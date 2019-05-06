@@ -75,16 +75,18 @@ FollowTarget::FollowTarget(Navigator *navigator) :
 void FollowTarget::on_inactive()
 {
 	reset_target_validity();
+//    PX4_INFO("执行 FollowTarget::on_inactive()");
 }
 
 void FollowTarget::on_activation()
 {
 	_follow_offset = _param_tracking_dist.get() < 1.0F ? 1.0F : _param_tracking_dist.get();
+    _follow_offset = 8.0f;
 
 	_responsiveness = math::constrain((float) _param_tracking_resp.get(), .1F, 1.0F);
 
 //	_follow_target_position = _param_tracking_side.get();
-    _follow_target_position = FOLLOW_FROM_BEHIND; //自定义让飞机跟在后面
+    _follow_target_position = FOLLOW_FROM_LEFT; //自定义让飞机跟在左边
 
 	if ((_follow_target_position > FOLLOW_FROM_LEFT) || (_follow_target_position < FOLLOW_FROM_RIGHT)) {
 		_follow_target_position = FOLLOW_FROM_BEHIND;
@@ -102,7 +104,7 @@ void FollowTarget::on_activation()
 void FollowTarget::on_active()
 {
 	struct map_projection_reference_s target_ref;
-	follow_target_s target_motion_with_offset = {};
+    follow_target_s target_motion_with_offset = {};  //从机目标位置的坐标,带速度偏移的
 	uint64_t current_time = hrt_absolute_time();
 	bool _radius_entered = false;
 //    bool speed_scale_update = false;
@@ -120,6 +122,8 @@ void FollowTarget::on_active()
 		follow_target_s target_motion;
 
 		_target_updates++;
+//        PX4_INFO("_target_updates递增数值 =  %.1f " ,1.0 * _target_updates);
+
 
 		// save last known motion topic
 
@@ -144,7 +148,7 @@ void FollowTarget::on_active()
     }
     //如果一段时间没有获得目标更新
     else if (((current_time - _current_target_motion.timestamp) / 1000) > TARGET_TIMEOUT_MS && target_velocity_valid()) {
-        printf("一段时间没有获得目标更新 _target_updates %d \n",_target_updates);
+        PX4_INFO("一段时间没有获得目标更新 _target_updates %d \n",_target_updates);
 		reset_target_validity();
 
 
@@ -157,7 +161,7 @@ void FollowTarget::on_active()
         //初始化当前的飞机坐标位置
 		map_projection_init(&target_ref, _navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
 
-        //使用当前飞机坐标和主机位置,计算从机到主机的位置向量
+        //使用当前飞机坐标和主机位置,计算从机到主机的位置向量 地轴系
 		map_projection_project(&target_ref, _current_target_motion.lat, _current_target_motion.lon, &_target_distance(0),
 				       &_target_distance(1));
 
@@ -178,10 +182,10 @@ void FollowTarget::on_active()
 			map_projection_project(&target_ref, _current_target_motion.lat, _current_target_motion.lon,
 					       &(_target_position_delta(0)), &(_target_position_delta(1)));
 
-            // 计算主机在dt时间中的平均速度向量  update the average velocity of the target based on the position
+            // 计算主机在dt时间中的平均速度向量  地轴系 update the average velocity of the target based on the position
             _est_target_vel = _target_position_delta / (dt_ms / 1000.0f);
 
-            // 当目标在运动时,要增加与目标运动有关的旋转和偏移   if the target is moving add an offset and rotation
+            // 获得从机目标位置到主机位置的位置向量     当目标在运动时,要增加与目标运动有关的旋转和偏移   if the target is moving add an offset and rotation
 			if (_est_target_vel.length() > .5F) {
 				_target_position_offset = _rot_matrix * _est_target_vel.normalized() * _follow_offset;
 			}
@@ -207,10 +211,13 @@ void FollowTarget::on_active()
 			_step_vel /= (dt_ms / 1000.0F * (float) INTERPOLATION_PNTS);
 			_step_time_in_ms = (dt_ms / (float) INTERPOLATION_PNTS);
 
+
+            _yaw_angle = _yaw_rate = NAN;
+             /* 下面这段关于偏航的部分,交给固定翼位置控制程序处理,此处无效
 			// if we are less than 1 meter from the target don't worry about trying to yaw
 			// lock the yaw until we are at a distance that makes sense
-
-            if ((_target_distance).length() > 5.0F) {
+             *
+             * if ((_target_distance).length() > 5.0F) {
 
 				// yaw rate smoothing
 
@@ -226,7 +233,9 @@ void FollowTarget::on_active()
 
 			} else {
 				_yaw_angle = _yaw_rate = NAN;
-			}
+            }  */
+
+
 		}
 
 //		warnx(" _step_vel x %3.6f y %3.6f cur vel %3.6f %3.6f tar vel %3.6f %3.6f dist = %3.6f (%3.6f) mode = %d yaw rate = %3.6f",
@@ -243,16 +252,17 @@ void FollowTarget::on_active()
 	}
 
 	if (target_position_valid()) {
-
+        //利用偏移距离 获得 从机目标位置的坐标
 		// get the target position using the calculated offset
 
 		map_projection_init(&target_ref,  _current_target_motion.lat, _current_target_motion.lon);
 		map_projection_reproject(&target_ref, _target_position_offset(0), _target_position_offset(1),
 					 &target_motion_with_offset.lat, &target_motion_with_offset.lon);
 
-//        target_motion_with_offset.alt = _current_target_motion.alt;
+        target_motion_with_offset.alt = _current_target_motion.alt;
 	}
 
+    /*下面这部分航向控制交给位置控制程序,此处无效
 	// clamp yaw rate smoothing if we are with in
 	// 3 degrees of facing target
 
@@ -261,13 +271,14 @@ void FollowTarget::on_active()
 			_yaw_rate = NAN;
 		}
 	}
+    */
 
-	// update state machine
+    // 更新状态机  update state machine
 
 
 	switch (_follow_target_state) {
 
-    case TRACK_POSITION: { //说明此时出圈了
+    case TRACK_POSITION: { //位置追踪模式      说明此时出圈了,飞机距离目标很远
 
             if (_radius_entered == true) {
 				_follow_target_state = TRACK_VELOCITY;
@@ -275,13 +286,16 @@ void FollowTarget::on_active()
 
             } else if (target_velocity_valid()) {
 
-                PX4_INFO("追踪位置 ");  //调试语句
+                PX4_INFO("TRACK_POSITION 23458 _est_target_vel %.1f",double(_est_target_vel.length()));  //调试语句
 
                 // keep the current velocity updated with the target velocity for when it's needed
+                //从机距离很远的时候,从机地速比主机大,这样能追的上
                 _current_vel = _est_target_vel;
 
-                if ((_target_position_offset(0) + _target_distance(0) < 0 )){ //说明此时飞机向前超越了范围
-                    _current_vel = 0.7f * _est_target_vel;
+                if (0){ //这部分先禁用
+                    if ((_target_position_offset(0) + _target_distance(0) < 0 )){ //说明此时飞机向前超越了范围
+                        _current_vel = 0.7f * _est_target_vel;
+                    }
                 }
                 set_follow_target_item(&_mission_item, _param_min_alt.get(), target_motion_with_offset, _yaw_angle);
                 update_position_sp(true, true, _yaw_rate);
@@ -300,16 +314,22 @@ void FollowTarget::on_active()
 
 			} else if (target_velocity_valid()) {
 
-                PX4_INFO("追踪速度 ");   //调试语句
+                PX4_INFO("TRACK_VELOCITY 78956");   //调试语句
 
-                //飞机在目标点范围内,对速度进行微调
-				if ((float)(current_time - _last_update_time) / 1000.0f >= _step_time_in_ms) {
-					_current_vel += _step_vel;
-					_last_update_time = current_time;
-				}
 
-//                target_motion_with_offset.alt = _current_target_motion.alt - 5.0f; //从机出圈的时候,高度设定为比主机低5米
-				set_follow_target_item(&_mission_item, _param_min_alt.get(), target_motion_with_offset, _yaw_angle);
+                if (0){ //选用
+                    //飞机进圈后先测试一下设置速度为极小值有无反应
+                    _current_vel = 0.1f * _est_target_vel;
+                } else {
+
+                    //飞机在目标点范围内,对速度进行微调
+                    if ((float)(current_time - _last_update_time) / 1000.0f >= _step_time_in_ms) {
+                        _current_vel += _step_vel;
+                        _last_update_time = current_time;
+                    }
+                }
+                //                target_motion_with_offset.alt = _current_target_motion.alt - 5.0f; //从机出圈的时候,高度设定为比主机低5米
+                set_follow_target_item(&_mission_item, _param_min_alt.get(), target_motion_with_offset, _yaw_angle);
 				update_position_sp(true, false, _yaw_rate);
 
 			} else {
@@ -323,7 +343,7 @@ void FollowTarget::on_active()
 
 			// Climb to the minimum altitude
 			// and wait until a position is received
-        PX4_INFO("设置为等待目标位置 ");  //调试语句
+        PX4_INFO("设置为等待目标位置 15896 ");  //调试语句
 
 			follow_target_s target = {};
 
@@ -343,9 +363,18 @@ void FollowTarget::on_active()
 	/* FALLTHROUGH */
 
 	case WAIT_FOR_TARGET_POSITION: {
-         PX4_INFO("等待目标位置 ");  //调试语句
+//         PX4_INFO("等待目标位置 75698 ");  //调试语句
 
-			if (is_mission_item_reached() && target_velocity_valid()) {
+         if(is_mission_item_reached()){
+
+             PX4_INFO("等待目标位置 mission_item_reached ");  //调试语句
+         } else {
+              PX4_INFO("等待目标位置 mission_item_NO reached ");  //调试语句
+         }
+        PX4_INFO("_target_updates =  %.1f " ,1.0 * _target_updates);
+
+
+            if (is_mission_item_reached() && target_velocity_valid()) {
 				_target_position_offset(0) = _follow_offset;
 				_follow_target_state = TRACK_POSITION;
 			}
@@ -409,20 +438,24 @@ void
 FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target,
 				     float yaw)
 {
-	if (_navigator->get_land_detected()->landed) {
+    if (_navigator->get_land_detected()->landed) {
 		/* landed, don't takeoff, but switch to IDLE mode */
 		item->nav_cmd = NAV_CMD_IDLE;
 
 	} else {
+
 
 		item->nav_cmd = NAV_CMD_DO_FOLLOW_REPOSITION;
 
 		/* use current target position */
 		item->lat = target.lat;
 		item->lon = target.lon;
+
+        //高度这里怎么传递还需要与主机联调决定
 //        item->altitude = target.alt;
          item->altitude = _navigator->get_home_position()->alt;
 
+//         PX4_INFO("DO_FOLLOW_REPOSITION target.alt = %.1f",double(1.0f * target.alt));
 
         if (min_clearance > 40.0f) {  //这里把追踪模式的最低高度改成40米,从机理论上会在40米高度飞行
 			item->altitude += min_clearance;
@@ -433,7 +466,7 @@ FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clea
 	}
 
 	item->altitude_is_relative = false;
-	item->yaw = yaw;
+    item->yaw = yaw;
 	item->loiter_radius = _navigator->get_loiter_radius();
 	item->acceptance_radius = _navigator->get_acceptance_radius();
 	item->time_inside = 0.0f;

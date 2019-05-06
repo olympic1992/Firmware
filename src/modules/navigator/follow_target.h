@@ -63,10 +63,10 @@ public:
 private:
 
 	static constexpr int TARGET_TIMEOUT_MS = 2500;
-    static constexpr int TARGET_ACCEPTANCE_RADIUS_M = 20;  //从机对目标位置的跟踪范围,距离小于此值时,认为飞机进圈,会切换跟踪模式
+    static constexpr int TARGET_ACCEPTANCE_RADIUS_M = 8;  //从机对目标位置的跟踪范围,距离小于此值时,认为飞机进圈,会切换跟踪模式
 	static constexpr int INTERPOLATION_PNTS = 20;
     static constexpr float FF_K = .5F;
-    static constexpr float OFFSET_M = 15;
+    static constexpr float OFFSET_M = 8.0f;
 
 	enum FollowTargetState {
 		TRACK_POSITION,

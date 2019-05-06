@@ -143,16 +143,10 @@ void
 FormationControl::send_follow_target_publish()
 {
 
-    //这一段预留:要增加对从机相对于主机位置的控制
-
-
-
-
-
     if (_send_follow_target_pub != nullptr) {
         /* publish the attitude rates setpoint */
         orb_publish(ORB_ID(follow_target), _send_follow_target_pub, &_send_follow_target);
-//printf("当前是从机,推送followme sp \n");
+//        PX4_INFO("当前是从机,推送ORB_ID(follow_target)");
 
     } else {
         /* advertise the attitude rates setpoint */
@@ -522,18 +516,21 @@ void FormationControl::run()
                     //                主机姿态和主机速度是主要数据源,要以最高速率更新;主机位置跟着发送.
                     //                数据打包发送到uorb主题
 
-                    //整理主机的实际位置,作为从机目标位置的依据
+                    //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
                     _mainuav_sp.lat = _mainuav_pos.lat;
                     _mainuav_sp.lon = _mainuav_pos.lon;
-                    _mainuav_sp.alt = _mainuav_pos.alt;
-                    _mainuav_sp.timestamp = hrt_absolute_time();  //测试数据
+                    _mainuav_sp.alt = _mainuav_pos.alt;  //获得主机海拔高度
+
+                    _mainuav_sp.vx = _mainuav_pos.vel_n;
+                    _mainuav_sp.vy = _mainuav_pos.vel_e;
+                    _mainuav_sp.vz = _mainuav_pos.vel_d;
+
+//                    _mainuav_sp.yaw_body = _mainuav_pos.yaw;   //主机的偏航角不需要发给从机,所以这部分没用
+
+                    _mainuav_sp.timestamp = _mainuav_pos.timestamp;  //传递主机数据的时间戳
 
 //                    _mainuav_sp.timestamp = (uint64_t)123456;  //测试数据
 printf("当前飞机是主机 _mainuav_sp.alt = %.1f  \n",(double)_mainuav_sp.alt);
-                    //整理主机的姿态设置点,作为从机的姿态设置点
-//                    _mainuav_sp.roll_body  = _mainuav_att.rollspeed;
-//                    _mainuav_sp.pitch_body = _mainuav_att.pitchspeed;
-//                    _mainuav_sp.yaw_body   = _mainuav_att.yawspeed;
 
 //                    printf("当前飞机是主机 _mainuav_sp.lat = %.7f  \n",_mainuav_sp.lat);
 
@@ -566,7 +563,7 @@ printf("当前飞机是主机 _mainuav_sp.alt = %.1f  \n",(double)_mainuav_sp.al
             } else if (poll_rec < 0) {  //严重错误
                 if (error_counter < 10 || error_counter % 50 == 0) {
                     /* use a counter to prevent flooding (and slowing us down) */
-                    PX4_ERR("ERROR return value from poll(): %d", poll_rec);
+                    PX4_ERR("从机: 没收到主机的编队数据  ERROR return value from poll(): %d", poll_rec);
                 }
                 error_counter++;
             } else {    //抓到数据
@@ -582,6 +579,14 @@ printf("当前飞机是主机 _mainuav_sp.alt = %.1f  \n",(double)_mainuav_sp.al
 
 
                     formationx_sp_poll();
+
+
+                    //这部分进行编队队形计算,计算出从机在编队中的相对位置
+
+
+
+
+                    //这部分通过从机相对位置和主机绝对位置\速度,将从机在编队中的绝对位置坐标发送给下一步
 
 
                     _send_follow_target.timestamp=_formationrec.timestamp;

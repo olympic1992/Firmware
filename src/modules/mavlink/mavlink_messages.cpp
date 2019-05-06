@@ -4191,20 +4191,18 @@ protected:
             msg.target_system = 0; // All systems
             msg.target_component = 0; // All components
 
-            msg.lat=formuorb.lat;
-            msg.lon=formuorb.lon;
-            msg.alt=formuorb.alt;
+            msg.lat = formuorb.lat;
+            msg.lon = formuorb.lon;
+            msg.alt = formuorb.alt;
 
-            msg.roll_body  =formuorb.roll_body;
-            msg.pitch_body =formuorb.pitch_body;
-            msg.yaw_body   =formuorb.yaw_body;
+            msg.vx = formuorb.vx;
+            msg.vy = formuorb.vy;
+            msg.vz = formuorb.vz;
+
+//            msg.yaw_body = formuorb.yaw_body;
 
 //            printf("测试数据 msg.alt = %.3f \n",(double)msg.alt);
 //            printf("测试数据 msg.roll_body = %.3f \n",(double)msg.roll_body);
-
-            msg.vx=formuorb.vx;
-            msg.vy=formuorb.vy;
-            msg.vz=formuorb.vz;
 
 
 

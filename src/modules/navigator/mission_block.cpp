@@ -73,11 +73,11 @@ MissionBlock::is_mission_item_reached()
 
 	case NAV_CMD_LAND: /* fall through */
 	case NAV_CMD_VTOL_LAND:
-        printf("现在是降落状态 \n"); //调试语句注意删除
+        printf("现在是降落状态 \n"); //调试语句注意
 		return _navigator->get_land_detected()->landed;
 
 	case NAV_CMD_IDLE: /* fall through */
-        printf("怠速状态 \n"); //调试语句注意删除
+        printf("怠速状态 \n"); //调试语句注意
 	case NAV_CMD_LOITER_UNLIMITED:
 		return false;
 
@@ -122,7 +122,7 @@ MissionBlock::is_mission_item_reached()
 
 	default:
 		/* do nothing, this is a 3D waypoint */
-        printf("显示 do nothing, this is a 3D waypoint ");
+//        PX4_INFO("显示 do nothing, this is a 3D waypoint3 ");
 		break;
 	}
 

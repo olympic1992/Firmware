@@ -811,11 +811,13 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 //       PX4_INFO("pos_sp_curr.type = %.1f",1.0 * pos_sp_curr.type); //调试语句
 
 		if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
+            PX4_INFO("SETPOINT_TYPE_IDLE !");
 			_att_sp.thrust = 0.0f;
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+            PX4_INFO("SETPOINT_TYPE_POSITION !");
 			/* waypoint is a plain navigation waypoint */
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
 			_att_sp.roll_body = _l1_control.nav_roll();
@@ -832,7 +834,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 						   radians(_parameters.pitch_limit_min));
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET) {  //这里是自定义的语句,增加的follow_target模式
 
-            PX4_INFO("执行FOLLOW_TARGET位置运算程序 !");
+            PX4_INFO("run FOLLOW_TARGET 4562 !");
 
             _l1_control.navigate_followme(prev_wp, curr_wp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
             _att_sp.roll_body = _l1_control.nav_roll();
@@ -840,17 +842,24 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 
             //计算目标空速
-            Vector2f ground_speed_sp{pos_sp_curr.vx,pos_sp_curr.vy}; //获得目标地速
-//            Vector2f follow_airspeed_sp = ground_speed_sp-wind_speed_2d; //目标风速矢量 = 目标地速 - 风速
-                        Vector2f follow_airspeed_sp = ground_speed_sp; //目标风速矢量 = 目标地速
-            float follow_airspeed(0);
-            if(pos_sp_curr.velocity_valid){
-//                follow_airspeed = follow_airspeed_sp.length(); //风速标量
-                follow_airspeed = follow_airspeed_sp(0); //风速标量,仅使用纵向的速度,不使用横向速度
-            } else {
-                follow_airspeed = _parameters.airspeed_trim;
-            }
+            Vector2f ground_speed_2d{pos_sp_curr.vx,pos_sp_curr.vy}; //获得目标地速
+//            Vector2f follow_airspeed_2d = ground_speed_2d-wind_speed_2d; //目标风速矢量 = 目标地速 - 风速
+                        Vector2f follow_airspeed_2d = ground_speed_2d; //目标风速矢量 = 目标地速
+            float follow_airspeed(0.0f);
 
+
+            follow_airspeed = math::max(sqrt(follow_airspeed_2d(0) * follow_airspeed_2d(0) + follow_airspeed_2d(1) * follow_airspeed_2d(1)), 4.0);
+            PX4_INFO("2356 follow_airspeed = %.2f ",double(1.0f * follow_airspeed));
+
+            if(0){ //这部分先禁用
+                if(pos_sp_curr.velocity_valid){ //主机速度有效时,使用目标速度,否则使用从机自定义速度
+                    follow_airspeed = math::max(follow_airspeed_2d.length(), 0.1f);//风速标量,仅使用纵向的速度,不使用横向速度
+                    PX4_INFO("主机速度有效 follow_airspeed = %.2f ",double(1.0f * follow_airspeed));
+
+                } else {
+                    follow_airspeed = _parameters.airspeed_trim;
+                }
+            }
 
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                            calculate_target_airspeed(follow_airspeed), //使用目标航点的速度作为跟随速度
@@ -1668,6 +1677,7 @@ FixedwingPositionControl::run()
 	fds[0].events = POLLIN;
 
 	while (!should_exit()) {
+//        PX4_INFO("位置控制!run");
 
 		/* wait for up to 500ms for data */
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
@@ -1701,6 +1711,7 @@ FixedwingPositionControl::run()
 
 		/* only run controller if position changed */
         if ((fds[0].revents & POLLIN) != 0) {
+
 
 
 
@@ -1749,6 +1760,8 @@ FixedwingPositionControl::run()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
+
+//            PX4_INFO("执行Control_position");
 			if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
 				_att_sp.timestamp = hrt_absolute_time();
 
