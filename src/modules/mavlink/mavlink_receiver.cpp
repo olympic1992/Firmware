@@ -2492,7 +2492,7 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
     temp.vy = formx_rec.vy;
     temp.vz = formx_rec.vz;
 
-//    temp.yaw_body = formx_rec.yaw_body;
+    temp.yaw_body = formx_rec.yaw_body;
 
 
 

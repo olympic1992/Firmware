@@ -46,8 +46,19 @@
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
+//#include <mathlib/mathlib.h>
+#include <lib/ecl/geo/geo.h>
+//#include <lib/mathlib/math/Limits.hpp>
+
+
+
 #include <px4_module_params.h>
 #include <uORB/topics/follow_target.h>
+
+
+//using matrix::Vector2f;
+
+
 
 class FollowTarget : public MissionBlock, public ModuleParams
 {
@@ -103,8 +114,10 @@ private:
 	float _step_time_in_ms{0.0f};
     float _follow_offset{OFFSET_M};  //从机跟踪目标到主机的距离
 
-	uint64_t _target_updates{0};
+    uint64_t _target_updates{0};
 	uint64_t _last_update_time{0};
+
+
 
 	matrix::Vector3f _current_vel;
 	matrix::Vector3f _step_vel;
@@ -114,12 +127,24 @@ private:
     matrix::Vector3f _target_position_delta;   //主机在dt时间中的位移向量
 	matrix::Vector3f _filtered_target_position_delta;
 
+    matrix::Vector2f offset_PA;
+    matrix::Vector2f offset_PB;
+    matrix::Vector2f offset_PA_ned;
+
+
+    follow_target_s target_motion{};
     follow_target_s _current_target_motion{};  //主机的当前坐标位置
     follow_target_s _previous_target_motion{}; //主机的上一个有效坐标位置
+
+    follow_target_s PA_with_offset{};
+    follow_target_s PB_with_offset{};
+
 
 	float _yaw_rate{0.0f};
 	float _responsiveness{0.0f};
 	float _yaw_angle{0.0f};
+
+
 
 	// Mavlink defined motion reporting capabilities
 	enum {
@@ -137,11 +162,12 @@ private:
 	bool target_position_valid();
 	void reset_target_validity();
 	void update_position_sp(bool velocity_valid, bool position_valid, float yaw_rate);
+    void update_ABposition_sp();
 	void update_target_motion();
 	void update_target_velocity();
 
 	/**
 	 * Set follow_target item
 	 */
-	void set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target, float yaw);
+    void set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target);
 };

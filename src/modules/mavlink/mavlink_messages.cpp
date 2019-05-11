@@ -4199,7 +4199,7 @@ protected:
             msg.vy = formuorb.vy;
             msg.vz = formuorb.vz;
 
-//            msg.yaw_body = formuorb.yaw_body;
+            msg.yaw_body = formuorb.yaw_body;
 
 //            printf("测试数据 msg.alt = %.3f \n",(double)msg.alt);
 //            printf("测试数据 msg.roll_body = %.3f \n",(double)msg.roll_body);
@@ -4207,7 +4207,7 @@ protected:
 
 
             printf("发送 msg.time_usec = %.1f \n",1.0 * msg.time_usec);
-            printf("发送 msg._sequence = %d \n",msg.seq);
+//            printf("发送 msg._sequence = %d \n",msg.seq);
 //                printf("测试数据 msg.lat = %.4f \n",(double)msg.lat);
 
 

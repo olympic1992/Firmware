@@ -39,6 +39,10 @@
 #include <px4_defines.h>
 #include <px4_posix.h>
 #include <px4_tasks.h>
+#include <mathlib/mathlib.h>
+#include <matrix/math.hpp>
+#include <lib/ecl/geo/geo.h>
+#include <lib/mathlib/math/Limits.hpp>
 #include <parameters/param.h>
 #include <perf/perf_counter.h>
 #include <uORB/Subscription.hpp>
@@ -55,8 +59,9 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/formationrec.h>
+
 #include <uORB/topics/formationx.h>
+#include <uORB/topics/formationrec.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 //#include <uORB/topics/offboard_control_mode.h>
@@ -71,6 +76,12 @@
 #include <uORB/topics/sensor_combined.h>
 
 //#include "mavlink_orb_subscription.h"
+
+
+using matrix::Vector2f;
+
+
+
 
 
 
@@ -112,27 +123,62 @@ private:
 
     int     _manual_control_setpoint_sub{-1};
 
+    bool run_test{false};
 
 
     int mav_sysid{-1};
     int mav_compid{-1};
 
-    orb_advert_t    _mainuav_sp_pub{nullptr};			/**<  */
+
+//定义编队队形:1字形,菱形,等等
+    enum FORMATION_SHAPE {
+        FORMATION_1,
+        FORMATION_rhombus4
+    } _form_shape_current{FORMATION_1};  //默认队形是纵向1字形
+
+
+
+    int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
+        { 0, 0}, // 1号机位置(主机) 坐标原点
+        {-1, 1}, // 2号机位置,主机右边,后面
+        {-2, 0}, // 3号机位置,主机后面
+        {-1,-1}  // 4号机位置,主机左边,后面
+    };
+
+
+
+
+
+
+
+    orb_advert_t    P1_send_pub{nullptr};			/**<  */
     orb_advert_t	_mavlink_log_pub{nullptr};
 //    orb_advert_t    _offboard_control_mode_pub{nullptr};
     orb_advert_t    _vehicle_command_pub{nullptr};
 
     orb_advert_t    _send_follow_target_pub{nullptr};
 
-    orb_id_t _mainuav_sp_id{nullptr};
 
-    formationx_s                _mainuav_sp{}; /*自定义的编队控制结构体 */
-    formationrec_s              _formationrec{}; /*自定义的编队控制结构体 */
+    orb_id_t P1_send_id{nullptr};
+
+    formationx_s         P1_send{}; /*自定义的编队控制结构体 */
+    formationrec_s         P1_received{}; /*从机收到的主机在之前某一时刻的位姿状态 */
+
+
+
+
+
     vehicle_command_s           _set_offboard{}; /*自定义的编队控制结构体 */
-//    offboard_control_mode_s     _offboard_control_mode{};
+    //    offboard_control_mode_s     _offboard_control_mode{};
     vehicle_command_s           _command{};
-    vehicle_status_s            status{};
+
     follow_target_s             _send_follow_target{}; /*自定义的编队控制结构体 */
+
+    uint8_t sys_id{0};
+    uint8_t comp_id{0};
+    bool status_valid{false};
+    uint8_t nav_status{0};
+
     manual_control_setpoint_s   _manual_sp{};
 
     vehicle_attitude_s   _mainuav_att{};
@@ -145,8 +191,11 @@ private:
     param_t			_param_system_id;
     param_t			_param_component_id;
 
-    void        formationx_sp_poll();
+    void        formationrec_sp_poll();
     void        status_poll();
+
+    void        test_data_program(bool enable_test);
+
 
     void        attitude_poll();
     void        formationx_sp_publish();

@@ -68,20 +68,32 @@ FormationControl::manual_control_setpoint_poll()
     }
 }
 
+//测试数据发送程序,一直发送假的GPS位置点和地速
+void
+FormationControl::test_data_program(bool enable_test)
+{
 
+    if(enable_test == false){ //程序执行的开关
+        return;
+    }
+
+    run_test = enable_test;
+
+
+}
 
 
 void
-FormationControl::formationx_sp_poll()
+FormationControl::formationrec_sp_poll()
 {
     /* check if there is a new setpoint */
     bool formationrec_updated;
     orb_check(_formationrec_sub, &formationrec_updated);
 
     if (formationrec_updated) {
-        orb_copy(ORB_ID(formationrec), _formationrec_sub, &_formationrec);
-//printf("收到主机编队信息....._formationrec.lat  :  %.7f \n", (double)_formationrec.lat);
-//printf("_formationrec.alt :\t%8.4f  \n",double(_formationrec.alt));
+        orb_copy(ORB_ID(formationrec), _formationrec_sub, &P1_received);
+//printf("收到主机编队信息.....P1_received.lat  :  %.7f \n", (double)P1_received.lat);
+//printf("P1_received.alt :\t%8.4f  \n",double(P1_received.alt));
 
     }
 
@@ -93,13 +105,21 @@ FormationControl::formationx_sp_poll()
 }
 
 
+
 void
 FormationControl::status_poll()
 {
     bool _updated;
+    static vehicle_status_s            status{};
     orb_check(_vehicle_status_sub, &_updated);
     if (_updated) {
           orb_copy(ORB_ID(vehicle_status), _vehicle_status_sub, &status);  //从飞行器状态中获得sysid
+
+          sys_id = status.system_id;
+          comp_id = status.component_id;
+          status_valid = (status.timestamp > 0);
+          nav_status = status.nav_state;
+
     }
 }
 
@@ -125,14 +145,14 @@ void
 FormationControl::formationx_sp_publish()
 {
 
-    if (_mainuav_sp_pub != nullptr) {
+    if (P1_send_pub != nullptr) {
         /* publish the attitude rates setpoint */
-        orb_publish(ORB_ID(formationx), _mainuav_sp_pub, &_mainuav_sp);
+        orb_publish(ORB_ID(formationx), P1_send_pub, &P1_send);
 //            PX4_INFO("推送formationx_sp_publish");
 
     } else {
         /* advertise the attitude rates setpoint */
-        _mainuav_sp_pub = orb_advertise(ORB_ID(formationx), &_mainuav_sp);
+        P1_send_pub = orb_advertise(ORB_ID(formationx), &P1_send);
     }
 }
 
@@ -196,6 +216,7 @@ FormationControl::send_follow_target_publish()
 bool
 FormationControl::check_aux_follow_sw()
 {
+  return true;  //调试语句,注意删除
     manual_control_setpoint_poll();
 
 //    printf("_manual_sp.aux1 : %.2f \n",(double)_manual_sp.aux1);
@@ -216,22 +237,25 @@ void
 FormationControl::enable_follow_target_mode(bool follow_target_enabled)
 {
     if (follow_target_enabled) {
-//        printf("启用followme模式 %d \n",follow_target_enabled);
-        status_poll();  //获取飞机状态
-        _command.command            = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;//设置模式命令id
-        _command.param1             = 1.0f;
-        _command.param2             = 4.0f;
-        _command.param3             = 8.0f;
-        _command.target_system      = status.system_id;
-        _command.target_component   = status.component_id;
+        //        printf("启用followme模式 %d \n",follow_target_enabled);
+        //        status_poll();  //获取飞机状态
 
-        if (_vehicle_command_pub != nullptr) {
-            orb_publish(ORB_ID(vehicle_command), _vehicle_command_pub, &_command);//发布这个命令
-        } else {
-            _vehicle_command_pub = orb_advertise(ORB_ID(vehicle_command), &_command);
+        if(nav_status != vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET){
+
+            _command.command            = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;//设置模式命令id
+            _command.param1             = 1.0f;
+            _command.param2             = 4.0f;
+            _command.param3             = 8.0f;
+            _command.target_system      = sys_id;
+            _command.target_component   = comp_id;
+
+            if (_vehicle_command_pub != nullptr) {
+                orb_publish(ORB_ID(vehicle_command), _vehicle_command_pub, &_command);//发布这个命令
+            } else {
+                _vehicle_command_pub = orb_advertise(ORB_ID(vehicle_command), &_command);
+            }
         }
     }
-
 }
 
 
@@ -416,11 +440,12 @@ void FormationControl::param_update_system()
 
 void FormationControl::run()
 {
+    sleep(8); //这是为了在启动程序之前正常启动飞控,让飞控正常进入followme模式,如果不延时有可能进不了模式
     PX4_INFO("Formation Control Run!");
 
     //    int fw_pos_ctrl_status_sub_fd = orb_subscribe(ORB_ID(fw_pos_ctrl_status));
     //提取主机数据
-//    int vehicle_attitude_setpoint_sub_fd = orb_subscribe(ORB_ID(vehicle_attitude_setpoint));
+    //    int vehicle_attitude_setpoint_sub_fd = orb_subscribe(ORB_ID(vehicle_attitude_setpoint));
 
     //提取从机接收到的数据
 
@@ -428,13 +453,16 @@ void FormationControl::run()
     _formationrec_sub               = orb_subscribe(ORB_ID(formationrec));
 
 
-//    _set_offboard_sub               = orb_subscribe(ORB_ID(vehicle_command));
+    //    _set_offboard_sub               = orb_subscribe(ORB_ID(vehicle_command));
     _vehicle_status_sub             = orb_subscribe(ORB_ID(vehicle_status));
     _vehicle_global_position_sub    = orb_subscribe(ORB_ID(vehicle_global_position));
     _follow_target_sub              = orb_subscribe(ORB_ID(follow_target));
     _manual_control_setpoint_sub    = orb_subscribe(ORB_ID(manual_control_setpoint));
     _params_sub                     = orb_subscribe(ORB_ID(parameter_update));
 
+
+    status_poll();  //在飞机循环之前,预先获得飞机状态
+    formationrec_sp_poll();
 
     /* 1.公告attitude主题 */
     //    struct vehicle_attitude_setpoint_s att;
@@ -455,194 +483,239 @@ void FormationControl::run()
 
     orb_set_interval(fds[0].fd, 50);//限制更新频率为20 Hz
 
+    PX4_INFO(" ");
+    PX4_INFO("formation_control 执行!! ");
+
+    PX4_INFO("formation_control should_exit?  %d",should_exit());
+
+
+
 
     while (!should_exit()) {
 
-//        manual_control_setpoint_poll();  //获取遥控器指令
+
+
+
+
+
+
+
         status_poll();  //获取飞机状态
 
-//        /* 当参数改变时更新参数 */
-//        bool params_updated = false;
-//        orb_check(_params_sub, &params_updated);
-
-//        if (params_updated) {
-//            /* read from param to clear updated flag */
-//            parameter_update_s update;
-//            orb_copy(ORB_ID(parameter_update), _params_sub, &update);
-
-//            /* update parameters from storage */
-//            param_update_system();
-//        }
 
         //根据飞机ID判断当前飞机的属性和位置,然后执行对应操作
         //ID 1 是主机,执行位置/导航姿态/速度/速度设置点发送等
         //ID 其他值是从机,从机接收主机的数据,根据编队队形计算相应的控制指令,然后进入offboard模式执行
 
 
-        if (status.system_id == 1) {
-//            printf("当前飞机是主机 \n");
-            //说明当前飞机是主机,执行主机相应操作
-            int poll_sp = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100); /* 等待100ms获取数据 */
+
+        if (sys_id <= 4 && sys_id >= 1){ //飞机编号正常
+
+            if (sys_id == 1) {
+                //            printf("当前飞机是主机 \n");
+                //说明当前飞机是主机,执行主机相应操作
+                int poll_sp = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100); /* 等待100ms获取数据 */
 
 
-            /* 处理结果*/
-            if (poll_sp == 0) {  //未得到数据
-                PX4_ERR("主机:在0.1秒内没有获得uorb vehicle_global_position 数据! ");
-            } else if (poll_sp < 0) {  //严重错误
-                if (error_counter < 10 || error_counter % 50 == 0) {
-                    /* use a counter to prevent flooding (and slowing us down) */
-                    PX4_ERR("ERROR return value from poll(): %d", poll_sp);
-                }
-                error_counter++;
-            } else {    //抓到数据
-                if ((fds[0].revents & POLLIN) != 0) {
-                    //注意:飞机必须启用attitude控制模式及以上的模式,否则飞机内部ORB_ID(vehicle_attitude_setpoint)不会更新,本程序也不会运行
-
-//                    struct vehicle_attitude_setpoint_s _mainuav_att;
-//                    orb_copy(ORB_ID(vehicle_attitude_setpoint), vehicle_attitude_setpoint_sub_fd, &_mainuav_att);
-
-
-                    attitude_poll();
+                /* 处理结果*/
+                if (poll_sp == 0) {  //未得到数据
+                    PX4_ERR("主机:在0.1秒内没有获得uorb vehicle_global_position 数据! ");
+                } else if (poll_sp < 0) {  //严重错误
+                    if (error_counter < 10 || error_counter % 50 == 0) {
+                        /* use a counter to prevent flooding (and slowing us down) */
+                        PX4_ERR("ERROR return value from poll(): %d", poll_sp);
+                    }
+                    error_counter++;
+                } else {    //抓到数据
+                    if ((fds[0].revents & POLLIN) != 0) {
 
 
 
-                    struct vehicle_global_position_s _mainuav_pos;
-                    orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &_mainuav_pos);
+                        //注意:飞机必须启用attitude控制模式及以上的模式,否则飞机内部ORB_ID(vehicle_attitude_setpoint)不会更新,本程序也不会运行
+
+                        //                    struct vehicle_attitude_setpoint_s _mainuav_att;
+                        //                    orb_copy(ORB_ID(vehicle_attitude_setpoint), vehicle_attitude_setpoint_sub_fd, &_mainuav_att);
 
 
-                    //                   struct fw_pos_ctrl_status_s _mainuav_navatt;
-                    //                   orb_copy(ORB_ID(fw_pos_ctrl_status), fw_pos_ctrl_status_sub_fd, &_mainuav_navatt);
-
-                    //                主机姿态和主机速度是主要数据源,要以最高速率更新;主机位置跟着发送.
-                    //                数据打包发送到uorb主题
-
-                    //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
-                    _mainuav_sp.lat = _mainuav_pos.lat;
-                    _mainuav_sp.lon = _mainuav_pos.lon;
-                    _mainuav_sp.alt = _mainuav_pos.alt;  //获得主机海拔高度
-
-                    _mainuav_sp.vx = _mainuav_pos.vel_n;
-                    _mainuav_sp.vy = _mainuav_pos.vel_e;
-                    _mainuav_sp.vz = _mainuav_pos.vel_d;
-
-//                    _mainuav_sp.yaw_body = _mainuav_pos.yaw;   //主机的偏航角不需要发给从机,所以这部分没用
-
-                    _mainuav_sp.timestamp = _mainuav_pos.timestamp;  //传递主机数据的时间戳
-
-//                    _mainuav_sp.timestamp = (uint64_t)123456;  //测试数据
-printf("当前飞机是主机 _mainuav_sp.alt = %.1f  \n",(double)_mainuav_sp.alt);
-
-//                    printf("当前飞机是主机 _mainuav_sp.lat = %.7f  \n",_mainuav_sp.lat);
-
-//                   printf("当前飞机是主机 hrt_absolute_time() = %d  \n",hrt_absolute_time());
-//                   printf("当前飞机是主机 _mainuav_sp.timestamp %d  \n",_mainuav_sp.timestamp);
-
-                      formationx_sp_publish();  //将主机数据推送到主机的uorb总线上,然后由mavlink发送出去
+                        struct vehicle_global_position_s P1_global_pos;
+                        orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &P1_global_pos);
 
 
-                }
-            }
-        } else if (check_aux_follow_sw()) {
-//             printf("当前是从机 \n");
+                        //                   struct fw_pos_ctrl_status_s _mainuav_navatt;
+                        //                   orb_copy(ORB_ID(fw_pos_ctrl_status), fw_pos_ctrl_status_sub_fd, &_mainuav_navatt);
 
-//            formationx_sp_poll();
+                        //                主机姿态和主机速度是主要数据源,要以最高速率更新;主机位置跟着发送.
+                        //                数据打包发送到uorb主题
 
+                        //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
+                        P1_send.lat = P1_global_pos.lat;
+                        P1_send.lon = P1_global_pos.lon;
+                        P1_send.alt = P1_global_pos.alt;  //获得主机海拔高度
 
-//            sleep(0.5f);
+                        P1_send.vx = P1_global_pos.vel_n;
+                        P1_send.vy = P1_global_pos.vel_e;
+                        P1_send.vz = P1_global_pos.vel_d;
 
-            //说明当前飞机是从机,并且遥控器上的编队开关启用了,此时要根据从机编号做相应操作
-            //不管是哪个从机,首先都要获取主机的数据
-            int poll_rec = px4_poll(&fds[1], (sizeof(fds) / sizeof(fds[1])), 300); /* 等待1000ms获取数据 */
+                        P1_send.yaw_body = P1_global_pos.yaw;   //主机的偏航角也要发给从机,当主机地速很小时使用主机机头指向.
 
-//            orb_copy(ORB_ID(formationx), _formationrec_sub, &_formationrec);
-//            printf("_formationrec.alt :\t%8.4f \n",double(_formationrec.alt));
+                        P1_send.timestamp = P1_global_pos.timestamp;  //传递主机数据的时间戳
 
-            /* 处理结果*/
-            if (poll_rec == 0) {  //未得到数据
-                PX4_ERR("从机: 在0.3秒内没有获得 uorb formationrec 数据 ");
-            } else if (poll_rec < 0) {  //严重错误
-                if (error_counter < 10 || error_counter % 50 == 0) {
-                    /* use a counter to prevent flooding (and slowing us down) */
-                    PX4_ERR("从机: 没收到主机的编队数据  ERROR return value from poll(): %d", poll_rec);
-                }
-                error_counter++;
-            } else {    //抓到数据
-                if (fds[1].revents & POLLIN) {
-                    //这一段预留:使从机进入follow_target模式  //试验时,程序和遥控器共同实现
-                    enable_follow_target_mode(check_aux_follow_sw());
+                        //                    P1_send.timestamp = (uint64_t)123456;  //测试数据
+                        printf("当前飞机是主机 P1_send.alt = %.1f  \n",(double)P1_send.alt);
 
+                        //                    printf("当前飞机是主机 P1_send.lat = %.7f  \n",P1_send.lat);
 
+                        //                   printf("当前飞机是主机 hrt_absolute_time() = %d  \n",hrt_absolute_time());
+                        //                   printf("当前飞机是主机 P1_send.timestamp %d  \n",P1_send.timestamp);
 
+                        formationx_sp_publish();  //将主机数据推送到主机的uorb总线上,然后由mavlink发送出去
 
-
-                    //将主机实际位置作为从机跟踪的目标位置,后续要加偏移值
-
-
-                    formationx_sp_poll();
-
-
-                    //这部分进行编队队形计算,计算出从机在编队中的相对位置
-
-
-
-
-                    //这部分通过从机相对位置和主机绝对位置\速度,将从机在编队中的绝对位置坐标发送给下一步
-
-
-                    _send_follow_target.timestamp=_formationrec.timestamp;
-//printf("_send_follow_target.timestamp :\t %.1f \n",1.0 * _send_follow_target.timestamp);
-
-
-                    //从机将获得的位置数据传递到follow数据
-                    _send_follow_target.alt=_formationrec.alt-8.0f; //从机高度减小保安全
-                    _send_follow_target.lat=_formationrec.lat;
-                    _send_follow_target.lon=_formationrec.lon;
-
-
-                    //下面这部分暂时没用
-                    _send_follow_target.vx=_formationrec.vx;
-                    _send_follow_target.vy=_formationrec.vy;
-                    _send_follow_target.vz=_formationrec.vz;
-
-
-
-
-                    //这一段预留:增加编队变换的控制程序,要想办法写的简洁易懂
-                    //下面这段预留:根据计算的各种位置向offboard模式的从机发送指令
-                    switch (mav_sysid) {
-                    case 2 :   //2号机的程序
-                        //设定2号机跟踪的位置是主机右侧10米
-
-                        //            mavlink_log_critical(&_mavlink_log_pub, "test = %.1f/n", double(_mainuav_sp.alt));
-
-                        //                        formationx_sp_poll();
-
-                        //                mavlink_log_critical(&_mavlink_log_pub, "test = %9.4f/n", double(_formationrec.alt_rec));
-                        //                        PX4_INFO("receiver :\t%8.4f",double(_formationrec.alt));
-
-
-                        break;
-                    case 3 :   //3号机的程序
-
-                        break;
-
-                    case 4 :   //4号机的程序
-
-                        break;
 
                     }
-
-                    send_follow_target_publish();
-
-
                 }
+            } else if (check_aux_follow_sw()) { //当前是从机
+
+                //说明当前飞机是从机,并且遥控器上的编队开关启用了,此时要根据从机编号做相应操作
+                //不管是哪个从机,首先都要获取主机的数据
+                int poll_rec = px4_poll(&fds[1], (sizeof(fds) / sizeof(fds[1])), 300); /* 等待1000ms获取数据 */
+
+                poll_rec =1; //调试语句,注意删除
+
+                /* 处理结果*/
+                if (poll_rec == 0) {  //未得到数据
+                    PX4_ERR("从机: 在0.3秒内没有获得 uorb formationrec 数据 ");
+                } else if (poll_rec < 0) {  //严重错误
+                    if (error_counter < 10 || error_counter % 20000 == 0) {
+                        /* use a counter to prevent flooding (and slowing us down) */
+                        PX4_ERR("从机: ERROR return value from poll(): %d  次数=%d", poll_rec ,error_counter);
+                    }
+                    error_counter++;
+                } else {    //抓到数据
+                    if (
+                            true || //调试语句,注意删除
+                            fds[1].revents & POLLIN) {
+
+                        sleep(1);  //调试语句,注意删除
+
+                        {//调试语句,注意删除
+                            struct vehicle_attitude_s Px_att;
+                            orb_copy(ORB_ID(vehicle_attitude), _att_sub, &Px_att);
+
+                            matrix::Dcmf R = matrix::Quatf(Px_att.q);
+                            matrix::Eulerf euler_angles(R);
+
+                            PX4_INFO("(euler_angles.psi()) = %8.4f ",double(math::degrees(euler_angles.psi())));
+                        }
+
+                        struct map_projection_reference_s target_ref;
+                        static formationrec_s  P1_with_offsetL{}; //根据从机相对主机的距离,计算出从机的目标位置
+                        enable_follow_target_mode(check_aux_follow_sw()); //这一段预留:使从机进入follow_target模式  //试验时,程序和遥控器共同实现
+                        formationrec_sp_poll();
+
+                        //                        orb_copy(ORB_ID(formationrec), _formationrec_sub, &P1_received);
+                        //                        PX4_INFO("P1_received.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f ",double(P1_received.alt),P1_received.timestamp,P1_received.lat,double(P1_received.vx));
+
+
+                        /*这一段预留:增加编队变换的控制程序,要想办法写的简洁易懂*/
+                        //输入,主机指令(或人工控制指令)
+                        //根据当前队形编号和目标队形编号,分时间输出不同的编队队形编号,要包括过渡队形编号.
+                        //输出,编队队形编号_form_shape_current
+
+                        _form_shape_current = FORMATION_1;
+
+
+
+
+
+                        /*这部分进行编队队形计算,计算出从机在编队中的相对位置*/
+                        //输入:编队队形编号
+                        //输出:从机在某一时刻相对于主机的距离向量 offset_L{L_along,L_cross}
+                        float L_distant(10.0f);  //编队飞机之间的距离
+                        Vector2f offset_L{L_distant,L_distant}; //从机相对主机的偏移距离向量,主机地轴航向作为x轴正方向,主机右侧是y正方向
+
+                        switch (_form_shape_current) {
+                        case FORMATION_1 :
+
+                            offset_L = {-1.0f * L_distant * (sys_id-1) ,0.0f};
+
+                            break;
+                        case FORMATION_rhombus4 :
+
+                            offset_L(0) = FORMATION_rhombus4_axis[sys_id][0] * L_distant;
+                            offset_L(1) = FORMATION_rhombus4_axis[sys_id][1] * L_distant;
+
+                            break;
+
+                        }
+
+                        /*这部分将从机相对位置(速度轴系)转换到从机相对位置(地轴系)*/ //主机被转换坐标轴的方向,向速度方向为x正,速度方向右边为y正,正北方向为地轴系x正,正东方向为地轴系y正
+                        Vector2f  V1_trans{P1_received.vx,P1_received.vy};    //收到的主机的速度.单位 m/s
+                        float cos_yaw_ned = V1_trans(0) / V1_trans.length();
+                        float sin_yaw_ned = V1_trans(1) / V1_trans.length();
+                        Vector2f offset_L_ned {offset_L(0) * cos_yaw_ned - offset_L(1) * sin_yaw_ned,
+                                    offset_L(1) * cos_yaw_ned + offset_L(0) * sin_yaw_ned};
+
+
+//                        PX4_INFO("offset_L(0) = %.1f ",double(offset_L(0)));
+
+
+
+                        /*
+                         * 这部分利用从机相对位置(地轴系)和预测的主机坐标,计算从机的目标坐标
+                         * 注意:这里不考虑时间的流逝,时间修正放在整个流程的最后一步处理 */
+
+                        map_projection_init(&target_ref,  P1_received.lat, P1_received.lon);
+                        map_projection_reproject(&target_ref, offset_L_ned(0), offset_L_ned(1),&P1_with_offsetL.lat, &P1_with_offsetL.lon);
+
+
+                        /*这部分将处理后的从机目标位置\速度发送给跟踪控制程序*/
+
+
+                        _send_follow_target.timestamp=P1_received.timestamp;
+                        //printf("_send_follow_target.timestamp :\t %.1f \n",1.0 * _send_follow_target.timestamp);
+
+
+                        //从机将获得的位置数据传递到follow数据
+
+                        _send_follow_target.lat=P1_with_offsetL.lat;
+                        _send_follow_target.lon=P1_with_offsetL.lon;
+                        _send_follow_target.alt=P1_received.alt; //从机要高度减小保安全
+
+
+                        //假设速度在短时间内不会有明显变化 直接赋值
+                        _send_follow_target.vx=P1_received.vx;
+                        _send_follow_target.vy=P1_received.vy;
+                        _send_follow_target.vz=P1_received.vz;
+
+                        _send_follow_target.yaw_body=P1_received.yaw_body;
+
+
+
+                        //                        PX4_INFO("_send_ftarget.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f "
+                        //                                 ,double(_send_follow_target.alt),_send_follow_target.timestamp,_send_follow_target.lat,double(_send_follow_target.vx));
+
+
+                        send_follow_target_publish();
+
+
+
+                    } else{
+                        PX4_INFO("fds[1].revents & POLLIN 异常");
+                        sleep(1);
+                    }
+                }
+            } else {
+                PX4_INFO("从机未进入followme模式");
+                sleep(1);
+
             }
-        } else {
-            printf("从机未进入followme模式 \n");
-            sleep(1.0f);
+
+
+        } else {//注意这里要报错
+            if(status_valid)  //当程序poll到的status数据有效时,才根据这个数据执行程序,避免初始值对程序造成不必要影响
+                PX4_ERR("sys_id = %d 从机status.system_id编号错误,不能继续执行,程序目前最多支持4机编队,请修改status.system_id为1~4之间的值!",sys_id);
         }
     }
-
     PX4_INFO("exiting");
 }
 

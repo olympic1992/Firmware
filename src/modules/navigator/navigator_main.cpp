@@ -746,6 +746,7 @@ Navigator::run()
 			_navigation_mode_array[i]->run(_navigation_mode == _navigation_mode_array[i]);
 		}
 
+        _land_detected.landed = false; //注意,调试语句,务必删除
 		/* if we landed and have not received takeoff setpoint then stay in idle */
 		if (_land_detected.landed &&
 		    !((_vstatus.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF)

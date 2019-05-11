@@ -80,7 +80,6 @@
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/formationx.h>
 #include <uORB/topics/formationrec.h>
 
 #include "mavlink_ftp.h"
@@ -210,9 +209,6 @@ private:
 	struct vehicle_control_mode_s _control_mode;
 
 
-
-
-//    orb_advert_t _formationx_pub;
 
 	orb_advert_t _global_pos_pub;
 	orb_advert_t _local_pos_pub;

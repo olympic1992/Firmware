@@ -61,6 +61,8 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <vtol_att_control/vtol_type.h>
+#include <uORB/topics/formationrec.h>
+
 
 using matrix::Eulerf;
 using matrix::Quatf;
@@ -293,5 +295,6 @@ private:
 	void		global_pos_poll();
 	void		vehicle_status_poll();
 	void		vehicle_land_detected_poll();
+    void      test_data_program(bool enable_test);
 
 };

@@ -77,7 +77,11 @@ MissionBlock::is_mission_item_reached()
 		return _navigator->get_land_detected()->landed;
 
 	case NAV_CMD_IDLE: /* fall through */
-        printf("怠速状态 \n"); //调试语句注意
+        static int times_print{0};
+        if(times_print % 5 == 0){
+            printf("怠速状态     times_print=%d\n",times_print); //调试语句注意
+        }
+        times_print ++;
 	case NAV_CMD_LOITER_UNLIMITED:
 		return false;
 

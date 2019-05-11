@@ -481,13 +481,13 @@ FixedwingPositionControl::calculate_target_airspeed(float airspeed_demand)
 
 	if (_airspeed_valid && PX4_ISFINITE(_att_sp.roll_body)) {
 
-		adjusted_min_airspeed = constrain(_parameters.airspeed_min / sqrtf(cosf(_att_sp.roll_body)), _parameters.airspeed_min,
+        adjusted_min_airspeed = constrain(_parameters.airspeed_min / sqrtf(cosf(_att_sp.roll_body)), _parameters.airspeed_min,
 						  _parameters.airspeed_max);
 	}
 
 	// add minimum ground speed undershoot (only non-zero in presence of sufficient wind)
 	// sanity check: limit to range
-	return constrain(airspeed_demand + _groundspeed_undershoot, adjusted_min_airspeed, _parameters.airspeed_max);
+    return constrain(airspeed_demand + _groundspeed_undershoot, adjusted_min_airspeed, _parameters.airspeed_max);
 }
 
 void
@@ -688,7 +688,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
 
-//    PX4_INFO("control_position 正在运行");  //调试语句
+//    if(INFO_enable) PX4_INFO("control_position 正在运行");  //调试语句
 	float dt = 0.01f;
 
 	if (_control_position_last_called > 0) {
@@ -714,7 +714,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 	// compute 2D groundspeed from airspeed-heading projection
 	Vector2f air_speed_2d{_airspeed * cosf(_yaw), _airspeed * sinf(_yaw)};
 
-//        Vector2f wind_speed_2d = ground_speed - air_speed_2d;
+    //根据地速与空速数据,计算环境风速.当空速有效时起效
+    Vector2f wind_speed_ned{0.0,0.0};
+    if(_airspeed_valid){
+        wind_speed_ned = ground_speed - air_speed_2d;
+    } else {
+        wind_speed_ned = {0.0,0.0};  //当空速数据无效时,风速归零
+//        if(INFO_enable) PX4_INFO("空速无效,风速归零!");
+    }
 
 
 	Vector2f nav_speed_2d{0.0f, 0.0f};
@@ -834,44 +841,127 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 						   radians(_parameters.pitch_limit_min));
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET) {  //这里是自定义的语句,增加的follow_target模式
 
-            PX4_INFO("run FOLLOW_TARGET 4562 !");
 
-            _l1_control.navigate_followme(prev_wp, curr_wp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
+            static bool INFO_enable{false};
+            static hrt_abstime last_info_time{0};
+            if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 2.0f) {
+                INFO_enable = true;
+                last_info_time = hrt_absolute_time();
+            }
+
+
+            if(INFO_enable) PX4_INFO("\n \n >>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<< \n");
+            /*  这部分进行横向控制    */
+
+
+            position_setpoint_s pos_sp_curr_with_delta = pos_sp_curr;
+            position_setpoint_s pos_sp_prev_with_delta = pos_sp_prev;
+            /*计算主机经过传输时间差位移后的预测坐标*/
+            if (pos_sp_curr.timestamp != 0) {  //收到正常的pos_sp_curr时才执行
+                //                if(INFO_enable) PX4_INFO("pos_sp_curr.timestamp %.0f ",double(pos_sp_curr.timestamp))  ;
+
+                float dt_trans_s(0.01f);  //时间差,单位 秒
+                dt_trans_s = (_global_pos.timestamp-pos_sp_curr.timestamp) * 1e-6f;  //计算主机位置时间戳到从机位置时间戳的时间差,这段时间差用来预测主机的实际位置
+                //                if(INFO_enable) PX4_INFO("dt_trans_s %.6f ",double(dt_trans_s))  ;
+                Vector2f  V1_trans{pos_sp_curr.vx,pos_sp_curr.vy};    //收到的主机的速度.单位 m/s
+                //                if(INFO_enable) PX4_INFO("V1_trans(0)= %.6f V1_trans(1)= %.6f ",double(V1_trans(0)),double(V1_trans(1)))  ;
+                Vector2f  P1_delta = dt_trans_s * V1_trans;  //主机在传输时间差内的位移 单位m
+                //                if(INFO_enable) PX4_INFO("P1_delta(0)= %.6f P1_delta(1)= %.6f ",double(P1_delta(0)),double(P1_delta(1)))  ;
+
+                //预测主机在传输时间差之后的位置坐标
+                struct map_projection_reference_s _sp_ref;
+                //计算current点 A点
+                map_projection_init(&_sp_ref,  pos_sp_curr.lat, pos_sp_curr.lon);
+                //                if(INFO_enable) PX4_INFO("           pos_sp_curr.lat= %.6f            pos_sp_curr.lon= %.6f ",double(pos_sp_curr.lat),double(pos_sp_curr.lon))  ;
+                map_projection_reproject(&_sp_ref, P1_delta(0), P1_delta(1),&pos_sp_curr_with_delta.lat, &pos_sp_curr_with_delta.lon);
+                //                if(INFO_enable) PX4_INFO("pos_sp_curr_with_delta.lat= %.6f pos_sp_curr_with_delta.lon= %.6f ",double(pos_sp_curr_with_delta.lat),double(pos_sp_curr_with_delta.lon))  ;
+                pos_sp_curr_with_delta.alt = pos_sp_curr.alt + pos_sp_curr.vz * dt_trans_s; //预测主机在传输时间差之后的高度
+
+                //计算previous点 B点
+                map_projection_init(&_sp_ref,  pos_sp_prev.lat, pos_sp_prev.lon);
+                map_projection_reproject(&_sp_ref, P1_delta(0), P1_delta(1),&pos_sp_prev_with_delta.lat, &pos_sp_prev_with_delta.lon);
+            }
+            Vector2f prev_wp_with_delta = {(float)pos_sp_prev_with_delta.lat, (float)pos_sp_prev_with_delta.lon};
+            Vector2f curr_wp_with_delta = {(float)pos_sp_curr_with_delta.lat, (float)pos_sp_curr_with_delta.lon};
+
+            _l1_control.navigate_followme(prev_wp_with_delta, curr_wp_with_delta, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
             _att_sp.roll_body = _l1_control.nav_roll();
             _att_sp.yaw_body = _l1_control.nav_bearing();
 
 
-            //计算目标空速
-            Vector2f ground_speed_2d{pos_sp_curr.vx,pos_sp_curr.vy}; //获得目标地速
-//            Vector2f follow_airspeed_2d = ground_speed_2d-wind_speed_2d; //目标风速矢量 = 目标地速 - 风速
-                        Vector2f follow_airspeed_2d = ground_speed_2d; //目标风速矢量 = 目标地速
-            float follow_airspeed(0.0f);
+
+            /* 这部分进行纵向控制 */
+
+            //计算目标地速
+
+            struct map_projection_reference_s curr_ref;
+            //计算飞机实际位置到目标位置A点的距离
+            Vector2f P2A_distance_ned{0.0f,0.0f}; //飞机实际位置P点到目标位置A点的距离
+            map_projection_init(&curr_ref, curr_pos(0), curr_pos(1));
+            map_projection_project(&curr_ref, pos_sp_curr_with_delta.lat, pos_sp_curr_with_delta.lon,
+                                   &P2A_distance_ned(0),&P2A_distance_ned(1));
 
 
-            follow_airspeed = math::max(sqrt(follow_airspeed_2d(0) * follow_airspeed_2d(0) + follow_airspeed_2d(1) * follow_airspeed_2d(1)), 4.0);
-            PX4_INFO("2356 follow_airspeed = %.2f ",double(1.0f * follow_airspeed));
+            Vector2f Psp2A_offset_ned{pos_sp_curr.x,pos_sp_curr.y};   //从机目标位置Psp点到预置点A的偏移向量
+            //            if(INFO_enable) PX4_INFO("P2A_distance_ned(0)= %8.2f  P2A_distance_ned(1)= %8.2f ",double(P2A_distance_ned(0)),double(P2A_distance_ned(1)));
+            //            if(INFO_enable) PX4_INFO("Psp2A_offset_ned(0)= %8.2f  Psp2A_offset_ned(1)= %8.2f ",double(Psp2A_offset_ned(0)),double(Psp2A_offset_ned(1)));
+            Vector2f V1_gndspd_ned{pos_sp_curr.vx,pos_sp_curr.vy}; //获得主机的地速,此数据传输给从机作为目标地速
+            Vector2f dL_P2Psp_ned = P2A_distance_ned - Psp2A_offset_ned;  //从机实际位置P到从机目标位置Psp之间的距离向量
+            //            if(INFO_enable) PX4_INFO("dL_P2Psp_ned(0)= %8.2f dL_P2Psp_ned(1)= %8.2f ",double(dL_P2Psp_ned(0)),double(dL_P2Psp_ned(1)));
+            Vector2f dV_V1jVx_ned = V1_gndspd_ned - ground_speed;  //主机地速减去从机地速
 
-            if(0){ //这部分先禁用
-                if(pos_sp_curr.velocity_valid){ //主机速度有效时,使用目标速度,否则使用从机自定义速度
-                    follow_airspeed = math::max(follow_airspeed_2d.length(), 0.1f);//风速标量,仅使用纵向的速度,不使用横向速度
-                    PX4_INFO("主机速度有效 follow_airspeed = %.2f ",double(1.0f * follow_airspeed));
 
-                } else {
-                    follow_airspeed = _parameters.airspeed_trim;
+            float bear_P2Psp_P1v = math::degrees(atan2f(dL_P2Psp_ned % V1_gndspd_ned,dL_P2Psp_ned * V1_gndspd_ned));
+            if(INFO_enable) PX4_INFO("bear_P2Psp_P1v = %.2f",double(bear_P2Psp_P1v));
+
+            float dL_P2Psp(math::constrain(dL_P2Psp_ned * V1_gndspd_ned.normalized(),-100.0f, 100.0f)); //将距离差向量投影到主机速度向量上 ,加限幅是为了防止Vx_gndspd_ned溢出
+            float dV_V1jVx(math::constrain(dV_V1jVx_ned * V1_gndspd_ned.normalized(), -50.0f,  50.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止Vx_gndspd_ned溢出
+
+            if(INFO_enable) {   //输出从机的跟踪状况
+                if(dL_P2Psp < -0.5f) {
+                    if(dL_P2Psp < -10.0f)
+                        PX4_INFO("超前:从机超前10米外>>>");
+                    else
+                        PX4_INFO("调整:从机超前>>>");
+                } else if(dL_P2Psp > 0.5f){
+                    if(dL_P2Psp > 10.0f)
+                        PX4_INFO("追赶:从机落后10米外<<<");
+                    else
+                        PX4_INFO("调整:从机落后<<<");
+                }else{
+                    PX4_INFO("正常:跟踪锁定");
                 }
             }
 
-            tecs_update_pitch_throttle(pos_sp_curr.alt,
-                           calculate_target_airspeed(follow_airspeed), //使用目标航点的速度作为跟随速度
-                           radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
-                           radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
-                           _parameters.throttle_min,
-                           _parameters.throttle_max,
-                           mission_throttle,
-                           false,
-                           radians(_parameters.pitch_limit_min));
+            //这里要注意差值向量的正负
+            Vector2f Vx_gndspd_ned = V1_gndspd_ned; //设定目标地速的基准值;
+            float K_P(0.1f); //距离差量的增益值  这个参数要做成地面站可调的
+            float K_D(0.01f); //速度差量的增益值  这个参数要做成地面站可调的
+            Vx_gndspd_ned = V1_gndspd_ned + V1_gndspd_ned.normalized() * (K_P * dL_P2Psp + K_D * dV_V1jVx); //从机目标地速向量于主机地速向量平行
 
-		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
+            if(INFO_enable) PX4_INFO("P1_gndspd(0) = %.2f ",double(V1_gndspd_ned(0)));
+
+            //计算目标空速
+            Vector2f Vx_airspd_ned = Vx_gndspd_ned-wind_speed_ned; //目标风速矢量 = 目标地速 - 风速
+            float follow_airspeed = math::max(Vx_airspd_ned.length(), 4.0f);
+            if(INFO_enable) PX4_INFO("follow_airspeed = %.2f dL_P2Psp= %.2f dV_V1jVx= %.2f pos_sp_curr.timestamp=%d",
+                                     double(follow_airspeed),double(dL_P2Psp),double(dV_V1jVx),pos_sp_curr.timestamp);
+
+
+
+
+            tecs_update_pitch_throttle(pos_sp_curr_with_delta.alt,
+                                       calculate_target_airspeed(follow_airspeed),
+                                       radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
+                                       radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
+                                       _parameters.throttle_min,
+                                       _parameters.throttle_max,
+                                       mission_throttle,
+                                       false,
+                                       radians(_parameters.pitch_limit_min));
+
+        INFO_enable = false;
+        } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
 
 			/* waypoint is a loiter waypoint */
 			_l1_control.navigate_loiter(curr_wp, curr_pos, pos_sp_curr.loiter_radius,
@@ -1683,6 +1773,7 @@ FixedwingPositionControl::run()
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
 
+
 		/* timed out - periodic check for _task_should_exit, etc. */
 		if (pret == 0) {
 			continue;
@@ -1756,12 +1847,17 @@ FixedwingPositionControl::run()
 			Vector2f curr_pos((float)_global_pos.lat, (float)_global_pos.lon);
 			Vector2f ground_speed(_global_pos.vel_n, _global_pos.vel_e);
 
+//            PX4_INFO("global_pos.timestamp1 %u ",_global_pos.timestamp)  ;
+
 			/*
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
 
 //            PX4_INFO("执行Control_position");
+//            PX4_INFO("_pos_sp_triplet.current.vx = %.1f",double(_pos_sp_triplet.current.vx));
+
+
 			if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
 				_att_sp.timestamp = hrt_absolute_time();
 

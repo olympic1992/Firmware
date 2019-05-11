@@ -187,6 +187,7 @@ static struct vehicle_land_detected_s land_detector = {};
 static float _eph_threshold_adj = INFINITY;	///< maximum allowable horizontal position uncertainty after adjustment for flight condition
 static bool _skip_pos_accuracy_check = false;
 
+
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -1480,6 +1481,7 @@ Commander::run()
 
 	while (!should_exit()) {
 
+
 		transition_result_t arming_ret = TRANSITION_NOT_CHANGED;
 
 		/* update parameters */
@@ -2758,7 +2760,7 @@ Commander::run()
 			}
 		}
 
-		usleep(COMMANDER_MONITORING_INTERVAL);
+		usleep(COMMANDER_MONITORING_INTERVAL);        
 	}
 
 	thread_should_exit = true;
@@ -3418,6 +3420,16 @@ Commander::check_posvel_validity(const bool data_valid, const float data_accurac
 void
 set_control_mode()
 {
+
+
+    static bool INFO_enable{false};
+    static hrt_abstime last_info_time{0};
+    if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 2.0f) {
+        INFO_enable = true;
+        last_info_time = hrt_absolute_time();
+    }
+
+
 	/* set vehicle_control_mode according to set_navigation_state */
 	control_mode.flag_armed = armed.armed;
 	control_mode.flag_external_manual_override_ok = (!status.is_rotary_wing && !status.is_vtol);
@@ -3426,7 +3438,7 @@ set_control_mode()
 
 	switch (status.nav_state) {
 	case vehicle_status_s::NAVIGATION_STATE_MANUAL:
-//        PX4_INFO("MANUAL 模式开启!");
+        if(INFO_enable) PX4_INFO("MANUAL 模式开启!");
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_rates_enabled = stabilization_required();
@@ -3441,7 +3453,7 @@ set_control_mode()
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_STAB:
-        PX4_INFO("STAB 模式开启!");
+        if(INFO_enable) PX4_INFO("STAB 模式开启!");
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_rates_enabled = true;
@@ -3508,14 +3520,16 @@ set_control_mode()
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_LAND:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_LANDENGFAIL:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_PRECLAND:
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER:
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
+    case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
+    case vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER:
+    case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
 
-        PX4_INFO("fallthrough 模式开启!");
+        if(status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET) {
+            if(INFO_enable) PX4_INFO("followme开启!");
+        }
 
-		control_mode.flag_control_manual_enabled = false;
-		control_mode.flag_control_auto_enabled = true;
+        control_mode.flag_control_manual_enabled = false;
+        control_mode.flag_control_auto_enabled = true;
 		control_mode.flag_control_rates_enabled = true;
 		control_mode.flag_control_attitude_enabled = true;
 		control_mode.flag_control_rattitude_enabled = false;
@@ -3586,7 +3600,7 @@ set_control_mode()
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
-        PX4_INFO("offboard 模式开启!");
+        if(INFO_enable) PX4_INFO("offboard 模式开启!");
 		control_mode.flag_control_manual_enabled = false;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_offboard_enabled = true;
@@ -3629,6 +3643,8 @@ set_control_mode()
 	default:
 		break;
 	}
+    INFO_enable = false;
+
 }
 
 bool

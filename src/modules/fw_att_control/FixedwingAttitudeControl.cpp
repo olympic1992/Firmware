@@ -435,6 +435,8 @@ void FixedwingAttitudeControl::run()
 
 	while (!should_exit()) {
 
+
+
 		/* only update parameters if they changed */
 		bool params_updated = false;
 		orb_check(_params_sub, &params_updated);
@@ -466,6 +468,12 @@ void FixedwingAttitudeControl::run()
 
 		/* only run controller if attitude changed */
 		if (fds[0].revents & POLLIN) {
+
+
+            test_data_program(true);  //调试语句,注意删除
+
+
+
 			static uint64_t last_run = 0;
 			float deltaT = (hrt_absolute_time() - last_run) / 1000000.0f;
 			last_run = hrt_absolute_time();
@@ -965,6 +973,158 @@ int FixedwingAttitudeControl::print_status()
 
 	return 0;
 }
+
+
+
+//测试数据发送程序,一直发送假的GPS位置点和地速
+void
+FixedwingAttitudeControl::test_data_program(bool enable_test)
+{
+    if(enable_test == false){ //程序执行的开关
+        //        return;
+    }else if(hrt_absolute_time()* 1e-6f>= 10.0f){
+
+        static bool INFO_enable{false};
+        static hrt_abstime last_info_time{0};
+        if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 2.0f) {
+            INFO_enable = true;
+            last_info_time = hrt_absolute_time();
+        }
+
+
+        static vehicle_global_position_s   _vehicle_global_position_fake{};
+
+        double lat_test{37.1};
+        double lon_test{40.1};
+        float  alt_test{400.0f};
+
+
+        float  vx_test{10.0f};
+        float  vy_test{10.0f};
+        float  vz_test{0.0f};
+        float  yaw_test{45.0f};
+
+
+
+        //这部分是模拟从机的GPS数据变化,需要重新写
+        static hrt_abstime prev_time2{0};
+        if(enable_test && (hrt_elapsed_time(&prev_time2) * 1e-6f >= 0.2f)){ //限定程序的最小执行间隔是?秒,模拟GPS发数据的频率
+            float dt_trans2 = hrt_elapsed_time(&prev_time2) * 1e-6f;
+            prev_time2 = hrt_absolute_time();
+
+            static int times_run2{0};//变量初始化,这里加static意思是仅初始化一次的全局变量
+
+
+            static  orb_advert_t    _vehicle_global_position_fake_pub{nullptr};
+
+
+            _vehicle_global_position_fake.timestamp = hrt_absolute_time();
+
+            if(times_run2 == 0){
+                //设定位置点初值
+                _vehicle_global_position_fake.lat = lat_test; //degree
+                _vehicle_global_position_fake.lon = lon_test; //degree
+                _vehicle_global_position_fake.alt = alt_test; // m
+            }
+
+
+            //        设定速度初值
+            _vehicle_global_position_fake.vel_n = vx_test -1.0f; // m/s
+            _vehicle_global_position_fake.vel_e = vy_test -1.0f ; // m/s
+            _vehicle_global_position_fake.vel_d = vz_test;  // m/s
+
+            _vehicle_global_position_fake.yaw = math::radians(yaw_test);
+
+            struct map_projection_reference_s _ref;
+
+            map_projection_init(&_ref,  _vehicle_global_position_fake.lat, _vehicle_global_position_fake.lon);
+            map_projection_reproject(&_ref, dt_trans2*_vehicle_global_position_fake.vel_n, dt_trans2*_vehicle_global_position_fake.vel_e,&_vehicle_global_position_fake.lat, &_vehicle_global_position_fake.lon);
+
+            _vehicle_global_position_fake.alt = _vehicle_global_position_fake.alt + _vehicle_global_position_fake.vel_d * dt_trans2 ;
+
+
+            if (_vehicle_global_position_fake_pub != nullptr) {
+                /* publish the attitude rates setpoint */
+                orb_publish(ORB_ID(vehicle_global_position), _vehicle_global_position_fake_pub, &_vehicle_global_position_fake);
+            } else {
+                /* advertise the attitude rates setpoint */
+                _vehicle_global_position_fake_pub = orb_advertise(ORB_ID(vehicle_global_position), &_vehicle_global_position_fake);
+            }
+
+            if(times_run2==500)times_run2=0;
+            times_run2 ++;
+
+        }
+
+
+        //这部分是模拟从机接收到的主机GPS数据
+        static hrt_abstime prev_time1{0};
+        if(enable_test && (hrt_elapsed_time(&prev_time1) * 1e-6f >= 0.2f)){ //限定程序的最小执行间隔是?秒,模拟GPS发数据的频率
+            float dt_trans1 = hrt_elapsed_time(&prev_time1) * 1e-6f;
+            prev_time1 = hrt_absolute_time();
+
+            static int times_run1{0};//变量初始化,这里加static意思是仅初始化一次的全局变量
+
+            static formationrec_s   _P1_send_fake{};
+            static  orb_advert_t    _P1_send_fake_pub{nullptr};
+
+
+            _P1_send_fake.timestamp = _vehicle_global_position_fake.timestamp; //-  20*1000; //hrt_absolute_time();// -  20*1000;
+
+            if(times_run1 == 0){
+                //设定位置点初值
+                _P1_send_fake.lat = lat_test; //degree
+                _P1_send_fake.lon = lon_test; //degree
+                _P1_send_fake.alt = alt_test; // m
+            }
+
+
+            //        设定速度初值
+            _P1_send_fake.vx = vx_test; // m/s
+            _P1_send_fake.vy = vy_test; // m/s
+            _P1_send_fake.vz = vz_test;  // m/s
+
+            _P1_send_fake.yaw_body = math::radians(yaw_test-7.0f);
+
+            struct map_projection_reference_s _ref;
+
+            map_projection_init(&_ref,  _P1_send_fake.lat, _P1_send_fake.lon);
+            map_projection_reproject(&_ref, dt_trans1*_P1_send_fake.vx, dt_trans1*_P1_send_fake.vy,&_P1_send_fake.lat, &_P1_send_fake.lon);
+
+            _P1_send_fake.alt = _P1_send_fake.alt + _P1_send_fake.vz * dt_trans1 ;
+
+
+
+            if (_P1_send_fake_pub != nullptr) {
+                /* publish the attitude rates setpoint */
+                orb_publish(ORB_ID(formationrec), _P1_send_fake_pub, &_P1_send_fake);
+
+                //                    if(INFO_enable) PX4_INFO("注意:发送假主机GPS数据! 发送%d次 时间%.1f秒",times_run1,hrt_absolute_time()*1e-6 );
+
+                if(INFO_enable) PX4_INFO("_global_posit_fk.lat:%8.6f lon:%8.6f vx:%8.4f vy:%8.4f ",_vehicle_global_position_fake.lat,_vehicle_global_position_fake.lon,double(_vehicle_global_position_fake.vel_n),double(_vehicle_global_position_fake.vel_e));
+                if(INFO_enable) PX4_INFO("_P1_send_fake.   lat:%8.6f lon:%8.6f vx:%8.4f vy:%8.4f ",_P1_send_fake.lat,_P1_send_fake.lon,double(_P1_send_fake.vx),double(_P1_send_fake.vy));
+                INFO_enable = false;
+
+            } else {
+                /* advertise the attitude rates setpoint */
+                _P1_send_fake_pub = orb_advertise(ORB_ID(formationrec), &_P1_send_fake);
+            }
+
+            if(times_run1==500)times_run1=0;
+            times_run1 ++;
+
+        }
+
+
+
+
+
+
+
+    }
+
+}
+
 
 int fw_att_control_main(int argc, char *argv[])
 {

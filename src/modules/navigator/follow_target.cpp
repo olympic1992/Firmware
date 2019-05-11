@@ -70,6 +70,10 @@ FollowTarget::FollowTarget(Navigator *navigator) :
 	_target_distance.zero();
 	_target_position_offset.zero();
 	_target_position_delta.zero();
+    offset_PA.zero();
+    offset_PB.zero();
+    offset_PA_ned.zero();
+
 }
 
 void FollowTarget::on_inactive()
@@ -84,6 +88,14 @@ void FollowTarget::on_activation()
     _follow_offset = 8.0f;
 
 	_responsiveness = math::constrain((float) _param_tracking_resp.get(), .1F, 1.0F);
+    _responsiveness = 0.0f;
+
+    float L_distantPA(50.0f);//2.0f * _navigator->get_acceptance_radius());  //A点到从机目标位置的距离,默认应大于2倍认为到点的距离
+    float L_distantPB(50.0f);  //B点到从机目标位置的距离,这个距离暂定20m
+
+    offset_PA = {L_distantPA,0.0f};             //PA方向为正
+    offset_PB = {-1.0f * L_distantPB , 0.0f};   //PB方向为负
+
 
 //	_follow_target_position = _param_tracking_side.get();
     _follow_target_position = FOLLOW_FROM_LEFT; //自定义让飞机跟在左边
@@ -103,285 +115,142 @@ void FollowTarget::on_activation()
 
 void FollowTarget::on_active()
 {
-	struct map_projection_reference_s target_ref;
-    follow_target_s target_motion_with_offset = {};  //从机目标位置的坐标,带速度偏移的
-	uint64_t current_time = hrt_absolute_time();
-	bool _radius_entered = false;
-//    bool speed_scale_update = false;
-	bool _radius_exited = false;
-	bool updated = false;
-	float dt_ms = 0;
+    //自定义输出的频率控制语句
+    static bool INFO_enable{false};
+    static hrt_abstime last_info_time{0};
+    if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 2.0f) {
+        INFO_enable = true;
+        last_info_time = hrt_absolute_time();
+    }
 
-	orb_check(_follow_target_sub, &updated);
 
-//    printf("检查FollowTarget::on_active()  updated %d \n",updated);
+
+    struct map_projection_reference_s target_ref;
+    uint64_t current_time = hrt_absolute_time();
+    bool updated = false;
+
+
+    orb_check(_follow_target_sub, &updated);
 
     if (updated) {  //如果获得了目标更新
 
-
-		follow_target_s target_motion;
-
-		_target_updates++;
-//        PX4_INFO("_target_updates递增数值 =  %.1f " ,1.0 * _target_updates);
+        _target_updates++;
+        //                PX4_INFO("_target_updates递增数值 =  %.0f " ,1.0 * _target_updates);
 
 
-		// save last known motion topic
+        // save last known motion topic
 
-		_previous_target_motion = _current_target_motion;
+        _previous_target_motion = _current_target_motion;
 
-		orb_copy(ORB_ID(follow_target), _follow_target_sub, &target_motion);
+        orb_copy(ORB_ID(follow_target), _follow_target_sub, &target_motion);
 
-		if (_current_target_motion.timestamp == 0) {
-			_current_target_motion = target_motion;
-		}
 
-		_current_target_motion.timestamp = target_motion.timestamp;
+        //这里对接收到的位置进行初步计算
+
+        if (_current_target_motion.timestamp == 0) {
+            _current_target_motion = target_motion;
+        }
+
+        _current_target_motion.timestamp = target_motion.timestamp;
         //下面的_responsiveness用来对本次接收的目标位置进行滤波.
-		_current_target_motion.lat = (_current_target_motion.lat * (double)_responsiveness) + target_motion.lat * (double)(
-                             1 - _responsiveness);
-		_current_target_motion.lon = (_current_target_motion.lon * (double)_responsiveness) + target_motion.lon * (double)(
-						     1 - _responsiveness);
-//        _current_target_motion.alt = _current_target_motion.alt * _responsiveness + target_motion.alt * (1 - _responsiveness); //附加一个对高度的滤波
+        _current_target_motion.lat = (_current_target_motion.lat * (double)_responsiveness) + target_motion.lat * (double)(
+                    1 - _responsiveness);
+        _current_target_motion.lon = (_current_target_motion.lon * (double)_responsiveness) + target_motion.lon * (double)(
+                    1 - _responsiveness);
+        //        _current_target_motion.alt = _current_target_motion.alt * _responsiveness + target_motion.alt * (1 - _responsiveness); //附加一个对高度的滤波
+        _current_target_motion.alt = target_motion.alt-10.0f;
 
-//        printf("显示target_motion.timestamp = %.1f \n",1.0 * target_motion.timestamp);
+        _current_target_motion.vx = target_motion.vx;  //
+        _current_target_motion.vy = target_motion.vy;
+        _current_target_motion.vz = target_motion.vz;
+
+        _current_target_motion.yaw_body = target_motion.yaw_body;
+
 
     }
     //如果一段时间没有获得目标更新
     else if (((current_time - _current_target_motion.timestamp) / 1000) > TARGET_TIMEOUT_MS && target_velocity_valid()) {
         PX4_INFO("一段时间没有获得目标更新 _target_updates %d \n",_target_updates);
-		reset_target_validity();
+        reset_target_validity();
+    }
 
 
+    //    PX4_INFO("_send_ftarget.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f "
+    //                                     ,double(_send_follow_target.alt),_send_follow_target.timestamp,_send_follow_target.lat,double(_send_follow_target.vx));
 
-	}
 
-    // update distance to target 更新目标相对位置
 
-    if (target_position_valid()) {// 获得从机到主机的位置向量
-        //初始化当前的飞机坐标位置
-		map_projection_init(&target_ref, _navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
 
-        //使用当前飞机坐标和主机位置,计算从机到主机的位置向量 地轴系
-		map_projection_project(&target_ref, _current_target_motion.lat, _current_target_motion.lon, &_target_distance(0),
-				       &_target_distance(1));
 
-	}
+    if (target_position_valid() && updated) {
+        _follow_target_state = TRACK_POSITION;
+        if(INFO_enable) PX4_INFO("追踪位置: _follow_target_state = %d ",_follow_target_state);
 
-    // update target velocity  更新目标速度
+        matrix::Vector2f  V_P1{_current_target_motion.vx,_current_target_motion.vy};    //收到的主机的速度.单位 m/s
 
-	if (target_velocity_valid() && updated) {
+        /*这部分将从机相对位置(速度轴系)转换到从机相对位置(地轴系)*/ //主机被转换坐标轴的方向,向速度方向为x正,速度方向右边为y正,正北方向为地轴系x正,正东方向为地轴系y正
+        float cos_yaw_ned = V_P1(0) / V_P1.length();
+        float sin_yaw_ned = V_P1(1) / V_P1.length();
 
-		dt_ms = ((_current_target_motion.timestamp - _previous_target_motion.timestamp) / 1000);
+        if(INFO_enable) PX4_INFO("地速方向与机头指向的偏差角度: %4.2f deg",double(math::degrees(atan2f(cos_yaw_ned,sin_yaw_ned)) - math::degrees(_current_target_motion.yaw_body))) ;
 
-		// ignore a small dt
-		if (dt_ms > 10.0F) {
-            // 初始化主机的前一个坐标位置
-			map_projection_init(&target_ref, _previous_target_motion.lat, _previous_target_motion.lon);
+        if(V_P1.length()<5.0f){   //当地速很小时,飞机有可能遭遇大逆风,或者主机没起飞,此时使用飞机机头指向
 
-            // 利用主机的当前坐标位置和前一个坐标位置计算主机在dt时间中的位移向量
-			map_projection_project(&target_ref, _current_target_motion.lat, _current_target_motion.lon,
-					       &(_target_position_delta(0)), &(_target_position_delta(1)));
+            //注意调试:这部分需要在飞行时确认飞机的地速方向与机头指向偏差不大,务必注意根据试验情况确定
+            cos_yaw_ned = cos(double(_current_target_motion.yaw_body));
+            sin_yaw_ned = sin(double(_current_target_motion.yaw_body));
+        }
 
-            // 计算主机在dt时间中的平均速度向量  地轴系 update the average velocity of the target based on the position
-            _est_target_vel = _target_position_delta / (dt_ms / 1000.0f);
+        offset_PA_ned = {offset_PA(0) * cos_yaw_ned + offset_PA(1) * sin_yaw_ned,
+                         offset_PA(1) * cos_yaw_ned - offset_PA(0) * sin_yaw_ned};
+        matrix::Vector2f offset_PB_ned {offset_PB(0) * cos_yaw_ned - offset_PB(1) * sin_yaw_ned,
+                    offset_PB(1) * cos_yaw_ned + offset_PB(0) * sin_yaw_ned};
 
-            // 获得从机目标位置到主机位置的位置向量     当目标在运动时,要增加与目标运动有关的旋转和偏移   if the target is moving add an offset and rotation
-			if (_est_target_vel.length() > .5F) {
-				_target_position_offset = _rot_matrix * _est_target_vel.normalized() * _follow_offset;
-			}
+        PB_with_offset = PA_with_offset = _current_target_motion;
 
-			// are we within the target acceptance radius?
-			// give a buffer to exit/enter the radius to give the velocity controller
-			// a chance to catch up
-// _target_distance(主机到从机实际位置的向量) 与  _target_position_offset(主机到从机目标位置的向量) 矢量相加,就是从机实际位置到从机目标位置的向量
-			_radius_exited = ((_target_position_offset + _target_distance).length() > (float) TARGET_ACCEPTANCE_RADIUS_M * 1.5f);
-			_radius_entered = ((_target_position_offset + _target_distance).length() < (float) TARGET_ACCEPTANCE_RADIUS_M);
+        map_projection_init(&target_ref,  _current_target_motion.lat, _current_target_motion.lon);
+        //计算A点坐标,A点位置为主机地速方向前方一定距离
+        map_projection_reproject(&target_ref, offset_PA_ned(0), offset_PA_ned(1),&PA_with_offset.lat, &PA_with_offset.lon);
+        //计算B点坐标,B点位置为从机地速方向后方一定距离
+        map_projection_reproject(&target_ref, offset_PB_ned(0), offset_PB_ned(1),&PB_with_offset.lat, &PB_with_offset.lon);
 
-			// to keep the velocity increase/decrease smooth
-			// calculate how many velocity increments/decrements
-			// it will take to reach the targets velocity
-			// with the given amount of steps also add a feed forward input that adjusts the
-			// velocity as the position gap increases since
-			// just traveling at the exact velocity of the target will not
-			// get any closer or farther from the target
+        set_follow_target_item(&_mission_item, _param_min_alt.get(), PA_with_offset);
+        update_ABposition_sp();
 
-            //递增速度 = (主机速度 - 从机实际速度) + (主机到从机目标位置向量 + 从机到主机向量) * 比例系数
-            //主机从机有速度差时,从机速度会变化; 从机实际位置与从机目标位置不同时,从机速度会变化
-            _step_vel = (_est_target_vel - _current_vel) + (_target_position_offset + _target_distance) * FF_K;
-			_step_vel /= (dt_ms / 1000.0F * (float) INTERPOLATION_PNTS);
-			_step_time_in_ms = (dt_ms / (float) INTERPOLATION_PNTS);
 
 
-            _yaw_angle = _yaw_rate = NAN;
-             /* 下面这段关于偏航的部分,交给固定翼位置控制程序处理,此处无效
-			// if we are less than 1 meter from the target don't worry about trying to yaw
-			// lock the yaw until we are at a distance that makes sense
-             *
-             * if ((_target_distance).length() > 5.0F) {
+        if(INFO_enable) PX4_INFO("PA_with_offset.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f ",double(PA_with_offset.alt),PA_with_offset.timestamp,PA_with_offset.lat,double(PA_with_offset.vx));
+        //            if(INFO_enable) PX4_INFO("_current_targe.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f ",double(_current_target_motion.alt),_current_target_motion.timestamp,_current_target_motion.lat,double(_current_target_motion.vx));
+        if(INFO_enable) PX4_INFO("PB_with_offset.alt :\t%8.4f \t%d lat:\t%8.6f vx:\t%8.4f ",double(PB_with_offset.alt),PB_with_offset.timestamp,PB_with_offset.lat,double(PB_with_offset.vx));
+        if(INFO_enable) PX4_INFO("offset_PA(0)= %.0f   offset_PB(0)= %.0f \n",double(offset_PA(0)),double(offset_PB(0)));
+        if(INFO_enable) PX4_INFO("target_motion.lat %8.7f    _current_target_motion.lat %8.7f ",  target_motion.lat,_current_target_motion.lat);
 
-				// yaw rate smoothing
 
-				// this really needs to control the yaw rate directly in the attitude pid controller
-				// but seems to work ok for now since the yaw rate cannot be controlled directly in auto mode
 
-				_yaw_angle = get_bearing_to_next_waypoint(_navigator->get_global_position()->lat,
-						_navigator->get_global_position()->lon,
-						_current_target_motion.lat,
-						_current_target_motion.lon);
+    } else { //飞机目标位置无效时,设置飞机当前位置作为目标位置,飞机会在此处长时间盘旋
 
-				_yaw_rate = wrap_pi((_yaw_angle - _navigator->get_global_position()->yaw) / (dt_ms / 1000.0f));
+        if(_follow_target_state == SET_WAIT_FOR_TARGET_POSITION) {
+            PX4_INFO("设置等待追踪位置: _follow_target_state = %d ",_follow_target_state);
 
-			} else {
-				_yaw_angle = _yaw_rate = NAN;
-            }  */
+            follow_target_s target = {};
+            // for now set the target at the minimum height above the uav
+            target.lat = _navigator->get_global_position()->lat;
+            target.lon = _navigator->get_global_position()->lon;
+            target.alt = 0.0F;
 
+            set_follow_target_item(&_mission_item, _param_min_alt.get(), target);
+            update_position_sp(false, false, _yaw_rate);
+            _follow_target_state = WAIT_FOR_TARGET_POSITION;
+        }
+        if (_follow_target_state == WAIT_FOR_TARGET_POSITION) {
+            PX4_INFO("等待追踪位置: _follow_target_state = %d ",_follow_target_state);
+            if (is_mission_item_reached() && target_position_valid()) {
+                _follow_target_state = TRACK_POSITION;
+            }
+        }
+    }
+    if(updated) INFO_enable = false;
 
-		}
-
-//		warnx(" _step_vel x %3.6f y %3.6f cur vel %3.6f %3.6f tar vel %3.6f %3.6f dist = %3.6f (%3.6f) mode = %d yaw rate = %3.6f",
-//				(double) _step_vel(0),
-//				(double) _step_vel(1),
-//				(double) _current_vel(0),
-//				(double) _current_vel(1),
-//				(double) _est_target_vel(0),
-//				(double) _est_target_vel(1),
-//				(double) (_target_distance).length(),
-//				(double) (_target_position_offset + _target_distance).length(),
-//				_follow_target_state,
-//				(double) _yaw_rate);
-	}
-
-	if (target_position_valid()) {
-        //利用偏移距离 获得 从机目标位置的坐标
-		// get the target position using the calculated offset
-
-		map_projection_init(&target_ref,  _current_target_motion.lat, _current_target_motion.lon);
-		map_projection_reproject(&target_ref, _target_position_offset(0), _target_position_offset(1),
-					 &target_motion_with_offset.lat, &target_motion_with_offset.lon);
-
-        target_motion_with_offset.alt = _current_target_motion.alt;
-	}
-
-    /*下面这部分航向控制交给位置控制程序,此处无效
-	// clamp yaw rate smoothing if we are with in
-	// 3 degrees of facing target
-
-	if (PX4_ISFINITE(_yaw_rate)) {
-		if (fabsf(fabsf(_yaw_angle) - fabsf(_navigator->get_global_position()->yaw)) < math::radians(3.0F)) {
-			_yaw_rate = NAN;
-		}
-	}
-    */
-
-    // 更新状态机  update state machine
-
-
-	switch (_follow_target_state) {
-
-    case TRACK_POSITION: { //位置追踪模式      说明此时出圈了,飞机距离目标很远
-
-            if (_radius_entered == true) {
-				_follow_target_state = TRACK_VELOCITY;
-//                speed_scale_update = false ;
-
-            } else if (target_velocity_valid()) {
-
-                PX4_INFO("TRACK_POSITION 23458 _est_target_vel %.1f",double(_est_target_vel.length()));  //调试语句
-
-                // keep the current velocity updated with the target velocity for when it's needed
-                //从机距离很远的时候,从机地速比主机大,这样能追的上
-                _current_vel = _est_target_vel;
-
-                if (0){ //这部分先禁用
-                    if ((_target_position_offset(0) + _target_distance(0) < 0 )){ //说明此时飞机向前超越了范围
-                        _current_vel = 0.7f * _est_target_vel;
-                    }
-                }
-                set_follow_target_item(&_mission_item, _param_min_alt.get(), target_motion_with_offset, _yaw_angle);
-                update_position_sp(true, true, _yaw_rate);
-
-            } else {
-				_follow_target_state = SET_WAIT_FOR_TARGET_POSITION;
-			}
-
-			break;
-		}
-
-    case TRACK_VELOCITY: { //说明此时已经进圈了
-
-            if (_radius_exited == true) {
-				_follow_target_state = TRACK_POSITION;
-
-			} else if (target_velocity_valid()) {
-
-                PX4_INFO("TRACK_VELOCITY 78956");   //调试语句
-
-
-                if (0){ //选用
-                    //飞机进圈后先测试一下设置速度为极小值有无反应
-                    _current_vel = 0.1f * _est_target_vel;
-                } else {
-
-                    //飞机在目标点范围内,对速度进行微调
-                    if ((float)(current_time - _last_update_time) / 1000.0f >= _step_time_in_ms) {
-                        _current_vel += _step_vel;
-                        _last_update_time = current_time;
-                    }
-                }
-                //                target_motion_with_offset.alt = _current_target_motion.alt - 5.0f; //从机出圈的时候,高度设定为比主机低5米
-                set_follow_target_item(&_mission_item, _param_min_alt.get(), target_motion_with_offset, _yaw_angle);
-				update_position_sp(true, false, _yaw_rate);
-
-			} else {
-				_follow_target_state = SET_WAIT_FOR_TARGET_POSITION;
-			}
-
-			break;
-		}
-
-	case SET_WAIT_FOR_TARGET_POSITION: {
-
-			// Climb to the minimum altitude
-			// and wait until a position is received
-        PX4_INFO("设置为等待目标位置 15896 ");  //调试语句
-
-			follow_target_s target = {};
-
-			// for now set the target at the minimum height above the uav
-
-			target.lat = _navigator->get_global_position()->lat;
-			target.lon = _navigator->get_global_position()->lon;
-			target.alt = 0.0F;
-
-			set_follow_target_item(&_mission_item, _param_min_alt.get(), target, _yaw_angle);
-
-			update_position_sp(false, false, _yaw_rate);
-
-			_follow_target_state = WAIT_FOR_TARGET_POSITION;
-		}
-
-	/* FALLTHROUGH */
-
-	case WAIT_FOR_TARGET_POSITION: {
-//         PX4_INFO("等待目标位置 75698 ");  //调试语句
-
-         if(is_mission_item_reached()){
-
-             PX4_INFO("等待目标位置 mission_item_reached ");  //调试语句
-         } else {
-              PX4_INFO("等待目标位置 mission_item_NO reached ");  //调试语句
-         }
-        PX4_INFO("_target_updates =  %.1f " ,1.0 * _target_updates);
-
-
-            if (is_mission_item_reached() && target_velocity_valid()) {
-				_target_position_offset(0) = _follow_offset;
-				_follow_target_state = TRACK_POSITION;
-			}
-
-			break;
-		}
-	}
 }
 
 void FollowTarget::update_position_sp(bool use_velocity, bool use_position, float yaw_rate)
@@ -392,7 +261,7 @@ void FollowTarget::update_position_sp(bool use_velocity, bool use_position, floa
 
 	// activate line following in pos control if position is valid
 
-	pos_sp_triplet->previous.valid = use_position;
+    pos_sp_triplet->previous.valid = use_position;
 	pos_sp_triplet->previous = pos_sp_triplet->current;
 	mission_apply_limitation(_mission_item);
 	mission_item_to_position_setpoint(_mission_item, &pos_sp_triplet->current);
@@ -406,6 +275,41 @@ void FollowTarget::update_position_sp(bool use_velocity, bool use_position, floa
 	pos_sp_triplet->current.yawspeed = yaw_rate;
 	_navigator->set_position_setpoint_triplet_updated();
 }
+
+
+void FollowTarget::update_ABposition_sp()
+{
+    // convert mission item to current setpoint
+
+    struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+
+    // activate line following in pos control if position is valid
+
+    pos_sp_triplet->previous.valid = true ;
+    pos_sp_triplet->previous.lat = PB_with_offset.lat;
+    pos_sp_triplet->previous.lon = PB_with_offset.lon;
+    pos_sp_triplet->previous.alt = PB_with_offset.alt;
+
+    mission_apply_limitation(_mission_item);
+    mission_item_to_position_setpoint(_mission_item, &pos_sp_triplet->current);
+    pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
+    pos_sp_triplet->current.position_valid = true;
+    pos_sp_triplet->current.velocity_valid = true;
+    pos_sp_triplet->current.vx = PA_with_offset.vx;
+    pos_sp_triplet->current.vy = PA_with_offset.vy;
+    pos_sp_triplet->current.vz = PA_with_offset.vz;
+    pos_sp_triplet->current.yaw = PA_with_offset.yaw_body;
+    pos_sp_triplet->current.x = offset_PA_ned(0);   //利用这个变量来传递A点相对于从机目标位置的坐标
+    pos_sp_triplet->current.y = offset_PA_ned(1);   //利用这个变量来传递A点相对于从机目标位置的坐标
+
+
+    pos_sp_triplet->current.timestamp = target_motion.timestamp; //传递主机时间
+    pos_sp_triplet->next.valid = false;
+
+    _navigator->set_position_setpoint_triplet_updated();
+}
+
+
 
 void FollowTarget::reset_target_validity()
 {
@@ -435,8 +339,7 @@ bool FollowTarget::target_position_valid()
 }
 
 void
-FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target,
-				     float yaw)
+FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target)
 {
     if (_navigator->get_land_detected()->landed) {
 		/* landed, don't takeoff, but switch to IDLE mode */
@@ -449,24 +352,24 @@ FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clea
 
 		/* use current target position */
 		item->lat = target.lat;
-		item->lon = target.lon;
+        item->lon = target.lon;
 
         //高度这里怎么传递还需要与主机联调决定
-//        item->altitude = target.alt;
-         item->altitude = _navigator->get_home_position()->alt;
+        //这里把追踪模式的最低高度改成40米,从机理论上会在40米高度以上飞行
+        item->altitude = math::max(target.alt,_navigator->get_home_position()->alt + math::max(40.0f,min_clearance));
 
-//         PX4_INFO("DO_FOLLOW_REPOSITION target.alt = %.1f",double(1.0f * target.alt));
+        //         PX4_INFO("DO_FOLLOW_REPOSITION target.alt = %.1f",double(target.alt));
 
-        if (min_clearance > 40.0f) {  //这里把追踪模式的最低高度改成40米,从机理论上会在40米高度飞行
-			item->altitude += min_clearance;
+//        if (min_clearance > 40.0f) {  //这里把追踪模式的最低高度改成40米,从机理论上会在40米高度飞行
+//			item->altitude += min_clearance;
 
-		} else {
-            item->altitude += 40.0f; // if min clearance is bad set it to 8.0 meters (well above the average height of a person)
-		}
+//		} else {
+//            item->altitude += 40.0f; // if min clearance is bad set it to 8.0 meters (well above the average height of a person)
+//		}
 	}
 
 	item->altitude_is_relative = false;
-    item->yaw = yaw;
+//    item->yaw = yaw;
 	item->loiter_radius = _navigator->get_loiter_radius();
 	item->acceptance_radius = _navigator->get_acceptance_radius();
 	item->time_inside = 0.0f;
