@@ -1425,6 +1425,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 				} else {
 					orb_publish(ORB_ID(vehicle_global_position), vehicle_global_position_pub, &global_pos);
+
 				}
 			}
 		}

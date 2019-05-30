@@ -341,23 +341,23 @@ protected:
 
 	bool send(const hrt_abstime t)
 	{
-		struct vehicle_status_s status = {};
+        struct vehicle_status_s status = {};
 
-		/* always send the heartbeat, independent of the update status of the topics */
-		if (!_status_sub->update(&status)) {
-			/* if topic update failed fill it with defaults */
-			memset(&status, 0, sizeof(status));
-		}
+        /* always send the heartbeat, independent of the update status of the topics */
+        if (!_status_sub->update(&status)) {
+            /* if topic update failed fill it with defaults */
+            memset(&status, 0, sizeof(status));
+        }
 
-		uint8_t base_mode = 0;
-		uint32_t custom_mode = 0;
-		uint8_t system_status = 0;
-		get_mavlink_mode_state(&status, &system_status, &base_mode, &custom_mode);
+        uint8_t base_mode = 0;
+        uint32_t custom_mode = 0;
+        uint8_t system_status = 0;
+        get_mavlink_mode_state(&status, &system_status, &base_mode, &custom_mode);
 
-		mavlink_msg_heartbeat_send(_mavlink->get_channel(), _mavlink->get_system_type(), MAV_AUTOPILOT_PX4,
-					   base_mode, custom_mode, system_status);
+        mavlink_msg_heartbeat_send(_mavlink->get_channel(), _mavlink->get_system_type(), MAV_AUTOPILOT_PX4,
+                       base_mode, custom_mode, system_status);
 
-		return true;
+        return true;
 	}
 };
 
@@ -4111,15 +4111,16 @@ protected:
 
 	bool send(const hrt_abstime t)
 	{
-		mavlink_ping_t msg = {};
+        mavlink_ping_t msg = {};
 
-		msg.time_usec = hrt_absolute_time();
-		msg.seq = _sequence++;
-		msg.target_system = 0; // All systems
-		msg.target_component = 0; // All components
+        msg.time_usec = hrt_absolute_time();
+        msg.seq = _sequence++;
+        msg.target_system = 0; // All systems
+        msg.target_component = 0; // All components
 
-		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &msg);
+        mavlink_msg_ping_send_struct(_mavlink->get_channel(), &msg);
 
+//        PX4_INFO("发送PING");
 		return true;
 	}
 };
@@ -4158,7 +4159,13 @@ public:
     }
 
 private:
+    MavlinkOrbSubscription *_vehicle_status_sub;
     MavlinkOrbSubscription *_formationx_sub;
+    MavlinkOrbSubscription *_globalpos_sub;
+    MavlinkOrbSubscription *_gpspos_sub;
+
+
+//    uint64_t _globalpos_time;
     uint32_t _sequence;
 
     /* do not allow top copying this class */
@@ -4167,56 +4174,77 @@ private:
 
 protected:
     explicit MavlinkStreamFormationx(Mavlink *mavlink) : MavlinkStream(mavlink),
+        _vehicle_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
         _formationx_sub(_mavlink->add_orb_subscription(ORB_ID(formationx))),
+        _globalpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position))),
+        _gpspos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_gps_position))),
+//        _globalpos_time(0),
         _sequence(0)
     {}
 
     bool send(const hrt_abstime t)       
     {
         bool updated = false;
-        struct formationx_s formuorb;
-        if (_formationx_sub->update(&formuorb)) {
-            updated = true;
+
+
+        vehicle_status_s status = {};
+        _vehicle_status_sub->update(&status);
+        if(status.system_id==mainplaneID) {
+
+//            PX4_INFO("status.system_id: %d ",status.system_id);
+            //ID为1说明是主机,不是主机时不发送编队信息
 
             mavlink_formationx_t msg = {};
 
-            // 数据来自uorb主题,然后发送到mavlink总线上.
 
-            msg.time_usec = formuorb.timestamp;//    hrt_absolute_time();
-//            msg.time_usec = 1234567;
+            vehicle_global_position_s globalpos = {};
+            vehicle_gps_position_s gpspos = {};
 
-
-
-            msg.seq = _sequence++;
-            msg.target_system = 0; // All systems
-            msg.target_component = 0; // All components
-
-            msg.lat = formuorb.lat;
-            msg.lon = formuorb.lon;
-            msg.alt = formuorb.alt;
-
-            msg.vx = formuorb.vx;
-            msg.vy = formuorb.vy;
-            msg.vz = formuorb.vz;
-
-            msg.yaw_body = formuorb.yaw_body;
-
-//            printf("测试数据 msg.alt = %.3f \n",(double)msg.alt);
-//            printf("测试数据 msg.roll_body = %.3f \n",(double)msg.roll_body);
+            if (_gpspos_sub->update(&gpspos)) {
+                _globalpos_sub->update(&globalpos);
+                updated = true;
+                //这里暂不使用global定位的时间,因为global时间会受其他传感器的融合状态影响
+                msg.time_usec = gpspos.time_utc_usec ;//+ (globalpos.timestamp - gpspos.timestamp);  //传递主机GPS数据的UTC时间
 
 
+                //                msg.seq = _sequence++;
+                //                msg.target_system = 0; // All systems
+                //                msg.target_component = 0; // All components
 
-            printf("发送 msg.time_usec = %.1f \n",1.0 * msg.time_usec);
-//            printf("发送 msg._sequence = %d \n",msg.seq);
-//                printf("测试数据 msg.lat = %.4f \n",(double)msg.lat);
+                //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
+                msg.lat = gpspos.lat;
+                msg.lon = gpspos.lon;
+
+                msg.alt = globalpos.alt;
+                msg.yaw_body = globalpos.yaw;   //主机的偏航角也要发给从机,当主机地速很小时使用主机机头指向.
+
+                //                msg.vx = gpspos.vel_n;
+                //                msg.vy = gpspos.vel_e;
+                //                msg.vz = gpspos.vel_d;
 
 
-            if (updated) {
-                mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
+                // 待办:           这里预留发送编队控制命令的位置,使用formuorb的内容
+                formationx_s formuorb = {};
+                _formationx_sub->update(&formuorb);
+
             }
-            return updated;
+
+            if(updated){
+                mavlink_msg_formationx_send_struct(_mavlink->get_channel(), &msg);
+
+                //输出发送频率
+                static uint64_t prevsendtime = 0;
+                uint64_t dt_sendtime = hrt_elapsed_time(&prevsendtime);
+                prevsendtime = hrt_absolute_time();
+                float sendHZ = 1.0f /(dt_sendtime * 1e-6f);
+                static uint64_t previnfotime{0};
+                if((hrt_elapsed_time(&previnfotime) * 1e-6f) > 2.0f){
+                    previnfotime = prevsendtime;
+                    PX4_INFO("formationX发送频率: %3.1fHz",double(sendHZ));
+                }
+            }
         }
-        return false;
+        return updated;
     }
 };
 

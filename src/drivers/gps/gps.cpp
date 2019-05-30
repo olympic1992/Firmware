@@ -451,7 +451,7 @@ void GPS::handleInjectDataTopic()
 			 * But as we don't write anywhere else to the device during operation, we don't
 			 * need to assemble the message first.
 			 */
-			injectData(msg.data, msg.len);
+            injectData(msg.data, msg.len);
 
 			++_last_rate_rtcm_injection_count;
 		}

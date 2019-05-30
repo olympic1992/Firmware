@@ -224,17 +224,17 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 			handle_message_command_int(msg);
 		}
 
-		break;
+        break;
 
-	case MAVLINK_MSG_ID_COMMAND_ACK:
-		handle_message_command_ack(msg);
-		break;
+    case MAVLINK_MSG_ID_COMMAND_ACK:
+        handle_message_command_ack(msg);
+        break;
 
-	case MAVLINK_MSG_ID_OPTICAL_FLOW_RAD:
-		handle_message_optical_flow_rad(msg);
-		break;
+    case MAVLINK_MSG_ID_OPTICAL_FLOW_RAD:
+        handle_message_optical_flow_rad(msg);
+        break;
 
-	case MAVLINK_MSG_ID_PING:
+    case MAVLINK_MSG_ID_PING:
 		handle_message_ping(msg);
 		break;
 
@@ -1152,7 +1152,7 @@ MavlinkReceiver::handle_message_gps_global_origin(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_attitude_quaternion_cov(mavlink_message_t *msg)
 {
-    PX4_INFO("收到attitude_quaternion_cov ");
+//    PX4_INFO("收到attitude_quaternion_cov ");
 	mavlink_attitude_quaternion_cov_t att;
 	mavlink_msg_attitude_quaternion_cov_decode(msg, &att);
 
@@ -1447,7 +1447,7 @@ MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
 	if ((ping.target_system == 0) &&
 	    (ping.target_component == 0)) {	   // This is a ping request. Return it to the system which requested the ping.
 
-        PX4_INFO("其他系统的PING请求 %d, %d, %d,",msg->sysid,msg->compid,msg->msgid);
+//        PX4_INFO("其他系统的PING请求 %d, %d, %d,",msg->sysid,msg->compid,msg->msgid);
 		ping.target_system = msg->sysid;
 		ping.target_component = msg->compid;
 		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &ping);
@@ -1456,11 +1456,27 @@ MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
 		   (ping.target_component ==
 		    mavlink_system.compid)) {	// This is a returned ping message from this system. Calculate latency from it.
 
-        PX4_INFO("回应本系统的PING %d, %d, %d,",msg->sysid,msg->compid,msg->msgid);
+
 		const hrt_abstime now = hrt_absolute_time();
 
 		// Calculate round trip time
 		float rtt_ms = (now - ping.time_usec) / 1000.0f;
+
+        if(msg->sysid == 255){
+            static int times_255{0};
+            times_255 ++;
+            if (times_255 % 10 ==0){
+                times_255=0;
+//                PX4_INFO("地面站回应本系统的PING(*10) %d, %d, %d  传输时间s:%.3f ,",msg->sysid,msg->compid,msg->msgid,double(rtt_ms/2.0f/1000.0f));
+            }
+        } else {
+//            PX4_INFO("回应本系统的PING %d, %d, %d  传输时间s:%.3f ,",msg->sysid,msg->compid,msg->msgid,double(rtt_ms/2.0f/1000.0f));
+        }
+
+
+
+
+
 
 		// Update ping statistics
 		struct Mavlink::ping_statistics_s &pstats = _mavlink->get_ping_statistics();
@@ -1836,8 +1852,9 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 //        PX4_INFO("收到heartbeat %d, %d,",msg->sysid,hb.type);
 
 		/* ignore own heartbeats, accept only heartbeats from GCS */
-		if (msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) {
-//            PX4_INFO("收到地面站的心跳包! %d, %d,",mavlink_system.sysid,hb.type);
+//        if (msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) {  //调试语句,换成下一句
+        if (msg->sysid == 255 && hb.type == MAV_TYPE_GCS) {
+//            PX4_INFO("收到地面站的心跳包! %d, %d, %d,",msg->sysid,mavlink_system.sysid,hb.type);
 
 			struct telemetry_status_s &tstatus = _mavlink->get_rx_status();
 
@@ -2098,24 +2115,24 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 
 void MavlinkReceiver::handle_message_follow_target(mavlink_message_t *msg)
 {
-    //这部分程序用来接收来自mavlink的followtarget消息,不使用这部分,屏蔽功能
-//	mavlink_follow_target_t follow_target_msg;
-//	follow_target_s follow_target_topic = {};
+////    这部分程序用来接收来自mavlink的followtarget消息,不使用这部分,屏蔽功能
+//    mavlink_follow_target_t follow_target_msg;
+//    follow_target_s follow_target_topic = {};
 
-//	mavlink_msg_follow_target_decode(msg, &follow_target_msg);
+//    mavlink_msg_follow_target_decode(msg, &follow_target_msg);
 
-//	follow_target_topic.timestamp = hrt_absolute_time();
+//    follow_target_topic.timestamp = hrt_absolute_time();
 
-//	follow_target_topic.lat = follow_target_msg.lat * 1e-7;
-//	follow_target_topic.lon = follow_target_msg.lon * 1e-7;
-//	follow_target_topic.alt = follow_target_msg.alt;
+//    follow_target_topic.lat = follow_target_msg.lat * 1e-7;
+//    follow_target_topic.lon = follow_target_msg.lon * 1e-7;
+//    follow_target_topic.alt = follow_target_msg.alt;
 
-//	if (_follow_target_pub == nullptr) {
-//		_follow_target_pub = orb_advertise(ORB_ID(follow_target), &follow_target_topic);
+//    if (_follow_target_pub == nullptr) {
+//        _follow_target_pub = orb_advertise(ORB_ID(follow_target), &follow_target_topic);
 
-//	} else {
-//		orb_publish(ORB_ID(follow_target), _follow_target_pub, &follow_target_topic);
-//	}
+//    } else {
+//        orb_publish(ORB_ID(follow_target), _follow_target_pub, &follow_target_topic);
+//    }
 }
 
 void MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
@@ -2213,7 +2230,7 @@ void MavlinkReceiver::handle_message_collision(mavlink_message_t *msg)
 
 void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg)
 {
-    PX4_INFO("收到gps_rtcm_data");
+//    PX4_INFO("收到gps_rtcm_data");
 	mavlink_gps_rtcm_data_t gps_rtcm_data_msg = {};
 	mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
 
@@ -2478,36 +2495,51 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
 //    将mavlink总线上的消息解码为msg,然后赋值给uorb消息,并且发送到uorb总线上
     mavlink_formationx_t formx_rec;
     mavlink_msg_formationx_decode(msg, &formx_rec);
-    struct formationrec_s temp;
+
+
+    struct follow_target_s temp;
 
     temp.timestamp = formx_rec.time_usec;
+    temp.timestamp2 = hrt_absolute_time();
 
-    temp.lat = formx_rec.lat;
-    temp.lon = formx_rec.lon;
+    temp.lat = formx_rec.lat / ((double)1e7);
+    temp.lon = formx_rec.lon / ((double)1e7);
     temp.alt = formx_rec.alt;
 
 
 
-    temp.vx = formx_rec.vx;
-    temp.vy = formx_rec.vy;
-    temp.vz = formx_rec.vz;
+//    temp.vx = formx_rec.vx;
+//    temp.vy = formx_rec.vy;
+//    temp.vz = formx_rec.vz;
 
-    temp.yaw_body = formx_rec.yaw_body;
-
-
+    temp.yaw = formx_rec.yaw_body;
 
 
-    if (_formationrec_pub != nullptr) {
+    //待办:这里的编队形状是预定义的,需要做成可以根据主机信息变换的
+    temp.formshape_id = temp.FORMSHAPE_VERTIAL1;
 
-//        printf("收到&上传主机编队信息....temp.timestamp  :  %.1f \n", 1.0 * temp.timestamp);
 
-        orb_publish(ORB_ID(formationrec), _formationrec_pub, &temp);
+
+
+    if (_follow_target_pub != nullptr) {
+        orb_publish(ORB_ID(follow_target), _follow_target_pub, &temp);
+
+
+
+        //输出运行频率
+        static uint64_t prevsendtime = 0;
+        uint64_t dt_sendtime = hrt_elapsed_time(&prevsendtime);
+        prevsendtime = hrt_absolute_time();
+        float sendHZ = 1.0f /(dt_sendtime * 1e-6f);
+        static uint64_t previnfotime{0};
+        if((hrt_elapsed_time(&previnfotime) * 1e-6f) > 10.0f){
+            previnfotime = prevsendtime;
+            PX4_INFO("formationX   接收频率: %3.1fHz",double(sendHZ));
+        }
 
 
     } else {
-
-        _formationrec_pub = orb_advertise(ORB_ID(formationrec), &temp);
-
+        _follow_target_pub = orb_advertise(ORB_ID(follow_target), &temp);
     }
 }
 
@@ -2629,72 +2661,84 @@ MavlinkReceiver::receive_thread(void *arg)
 #endif
 			// only start accepting messages once we're sure who we talk to
 
-			if (_mavlink->get_client_source_initialized()) {
-				/* if read failed, this loop won't execute */
-				for (ssize_t i = 0; i < nread; i++) {
-					if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
+            if (_mavlink->get_client_source_initialized()) {
+                /* if read failed, this loop won't execute */
+                for (ssize_t i = 0; i < nread; i++) {
+                    if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
 
-						/* check if we received version 2 and request a switch. */
-						if (!(_mavlink->get_status()->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
-							/* this will only switch to proto version 2 if allowed in settings */
-							_mavlink->set_proto_version(2);
-						}
+                        /* check if we received version 2 and request a switch. */
+                        if (!(_mavlink->get_status()->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
+                            /* this will only switch to proto version 2 if allowed in settings */
+                            _mavlink->set_proto_version(2);
+                        }
 
-//                        PX4_INFO("msg.msgid : %d",msg.msgid);
+                        if(_mavlink->get_mode() == Mavlink::MAVLINK_MODE_ONBOARD){ //调试,这一句用来禁止下面这个在onboard模式上接收
+                            if(msg.msgid != 190 && msg.msgid != 4 ){
+                                PX4_INFO("MODE_ONBOARD msg.msgid : %d",msg.msgid);
+                                _mavlink->send_statustext_critical("#其他ONBOARD消息");
 
-						/* handle generic messages and commands */
-						handle_message(&msg);
+                            }
+                        }
 
-						/* handle packet with mission manager */
-						if (_mission_manager != nullptr) {
-							_mission_manager->handle_message(&msg);
-						}
+                        /* handle generic messages and commands */
+                        handle_message(&msg);
 
-						/* handle packet with parameter component */
-						_parameters_manager.handle_message(&msg);
 
-						if (_mavlink->ftp_enabled()) {
-							/* handle packet with ftp component */
-							_mavlink_ftp.handle_message(&msg);
-						}
 
-						/* handle packet with log component */
-						_mavlink_log_handler.handle_message(&msg);
+                        /* handle packet with mission manager */
+                        if (_mission_manager != nullptr) {
+                            _mission_manager->handle_message(&msg);
+                        }
 
-						/* handle packet with timesync component */
-						_mavlink_timesync.handle_message(&msg);
+                        /* handle packet with parameter component */
+                        _parameters_manager.handle_message(&msg);
 
-						/* handle packet with parent object */
-						_mavlink->handle_message(&msg);
-					}
-				}
+                        if (_mavlink->ftp_enabled()) {
+                            /* handle packet with ftp component */
+                            _mavlink_ftp.handle_message(&msg);
+                        }
 
-				/* count received bytes (nread will be -1 on read error) */
-				if (nread > 0) {
-					_mavlink->count_rxbytes(nread);
-				}
-			}
-		}
+                        /* handle packet with log component */
+                        _mavlink_log_handler.handle_message(&msg);
 
-		hrt_abstime t = hrt_absolute_time();
+                        /* handle packet with timesync component */
+                        _mavlink_timesync.handle_message(&msg);
 
-		if (t - last_send_update > timeout * 1000) {
-			if (_mission_manager != nullptr) {
-				_mission_manager->check_active_mission();
-				_mission_manager->send(t);
-			}
+                        /* handle packet with parent object */
+                        _mavlink->handle_message(&msg);
 
-			_parameters_manager.send(t);
 
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send(t);
-			}
+                    }
+                }
 
-			_mavlink_log_handler.send(t);
-			last_send_update = t;
-		}
+                /* count received bytes (nread will be -1 on read error) */
+                if (nread > 0) {
+                    _mavlink->count_rxbytes(nread);
+                }
+            }
+        }
 
-	}
+        hrt_abstime t = hrt_absolute_time();
+        if(_mavlink->get_mode() != Mavlink::MAVLINK_MODE_ONBOARD)  //调试
+        { //调试,这一句用来禁止下面这个在onboard模式上发送
+            if (t - last_send_update > timeout * 1000) {
+                if (_mission_manager != nullptr) {
+                    _mission_manager->check_active_mission();
+                    _mission_manager->send(t);
+                }
+
+                _parameters_manager.send(t);
+
+                if (_mavlink->ftp_enabled()) {
+                    _mavlink_ftp.send(t);
+                }
+
+                _mavlink_log_handler.send(t);
+                last_send_update = t;
+            }
+        }
+
+    }
 
 	return nullptr;
 }

@@ -600,7 +600,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		    home_position_s *home, orb_advert_t *home_pub, orb_advert_t *command_ack_pub, bool *changed)
 {
 	/* only handle commands that are meant to be handled by this system and component */
-	if (cmd.target_system != status_local->system_id || ((cmd.target_component != status_local->component_id)
+    if (cmd.target_system != status_local->system_id || ((cmd.target_component != status_local->component_id)
 			&& (cmd.target_component != 0))) { // component_id 0: valid for all components
 		return false;
 	}
@@ -3424,7 +3424,7 @@ set_control_mode()
 
     static bool INFO_enable{false};
     static hrt_abstime last_info_time{0};
-    if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 2.0f) {
+    if(hrt_elapsed_time(&last_info_time)  * 1e-6f >= 10.0f) {
         INFO_enable = true;
         last_info_time = hrt_absolute_time();
     }

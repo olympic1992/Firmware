@@ -90,6 +90,10 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/follow_target.h>
+#include <uORB/topics/home_position.h>
+
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
@@ -155,6 +159,13 @@ public:
 private:
 	orb_advert_t	_mavlink_log_pub{nullptr};
 
+    bool home_alt_valid() { return (_home_pos.timestamp > 0 && _home_pos.valid_alt); }
+
+    home_position_s					_home_pos{};		/**< home position for RTL */
+    int		_home_pos_sub{-1};		/**< home position subscription */
+
+    bool INFO_enable{false};
+
 	int		_global_pos_sub{-1};
 	int		_local_pos_sub{-1};
 	int		_pos_sp_triplet_sub{-1};
@@ -166,6 +177,8 @@ private:
 	int		_params_sub{-1};			///< notification of parameter updates */
 	int		_manual_control_sub{-1};		///< notification of manual control updates */
 	int		_sensor_baro_sub{-1};
+
+    int		_vehicle_gps_position_sub{-1};
 
 	orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
 	orb_advert_t	_tecs_status_pub{nullptr};		///< TECS status publication */
@@ -184,6 +197,21 @@ private:
 	vehicle_local_position_s	_local_pos {};			///< vehicle local position */
 	vehicle_land_detected_s		_vehicle_land_detected {};	///< vehicle land detected */
 	vehicle_status_s		_vehicle_status {};		///< vehicle status */
+
+
+
+    int _follow_target_sub{-1};
+
+    position_setpoint_s pos_sp_curr_plus_dL{};
+    position_setpoint_s pos_sp_prev_plus_dL{};
+
+    Vector2f prev_wp_plus_dL{};
+    Vector2f curr_wp_plus_dL{};
+
+
+Vector2f Psp2A_offset_ned{};
+
+
 
 	Subscription<airspeed_s> _sub_airspeed;
 	Subscription<sensor_bias_s> _sub_sensors;
@@ -216,6 +244,8 @@ private:
 
 	float _t_alt_prev_valid{0};				///< last terrain estimate which was valid */
 	hrt_abstime _time_last_t_alt{0};			///< time at which we had last valid terrain alt */
+
+
 
 	float _flare_height{0.0f};				///< estimated height to ground at which flare started */
 	float _flare_pitch_sp{0.0f};			///< Current forced (i.e. not determined using TECS) flare pitch setpoint */
@@ -383,6 +413,7 @@ private:
 	void		vehicle_control_mode_poll();
 	void		vehicle_land_detected_poll();
 	void		vehicle_status_poll();
+    void        home_position_update(bool force);
 
 	// publish navigation capabilities
 	void		fw_pos_ctrl_status_publish();
@@ -430,6 +461,14 @@ private:
 	void		control_landing(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
 					const position_setpoint_s &pos_sp_curr);
 
+
+
+    matrix::Vector2f bodytoNED(matrix::Vector2f L_body,matrix::Vector2f speed_ned, float yaw);
+
+
+    void		control_follow_target(const Vector2f &nav_speed_2d,
+                                      const Vector2f &air_speed_2d,const float mission_throttle,
+                                      const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr);
 	float		get_tecs_pitch();
 	float		get_tecs_thrust();
 

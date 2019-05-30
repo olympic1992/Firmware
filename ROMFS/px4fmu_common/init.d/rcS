@@ -560,7 +560,8 @@ then
 	if [ $MAVLINK_F == default ]
 	then
 		# Normal mode, use baudrate 57600 (default) and data rate 1000 bytes/s
-		set MAVLINK_F "-r 1200 -f"
+		set MAVLINK_F "-r 1200"
+# 注意,上面禁用了-f功能,禁用了广播模式  ,调试使用,原句如下 set MAVLINK_F "-r 1200 -f"
 
 		# Use ttyS1 for MAVLink on FMUv4 in addition to ttyS0 (debug)
 		if ver hwcmp PX4FMU_V4
@@ -605,6 +606,13 @@ fi
 	fi
 	unset MAVLINK_F
 
+# 自定义第二串口使用onboard模式
+param set SYS_COMPANION 57600
+# 定义mavlink版本为2
+param set MAV_PROTO_VER 2
+
+
+
 	#
 	# MAVLink onboard / TELEM2
 	#
@@ -643,7 +651,8 @@ fi
 	fi
 	if param compare SYS_COMPANION 57600
 	then
-		mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 57600 -m onboard -r 5000 -x -f
+		mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 57600 -m onboard -r 5000 -x
+# 调试使用,禁用广播模式,取消-f功能,原句如下 mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 57600 -m onboard -r 5000 -x -f
 	fi
 	if param compare SYS_COMPANION 460800
 	then

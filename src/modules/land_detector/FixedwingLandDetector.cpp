@@ -89,7 +89,7 @@ float FixedwingLandDetector::_get_max_altitude()
 	// TODO
 	// This means no altitude limit as the limit
 	// is always current position plus 10000 meters
-	return roundf(-_local_pos.z + 10000);
+    return roundf(-_local_pos.z + 10000);
 }
 
 bool FixedwingLandDetector::_get_landed_state()

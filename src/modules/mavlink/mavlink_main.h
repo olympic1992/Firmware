@@ -82,6 +82,7 @@ enum Protocol {
 };
 
 #define HASH_PARAM "_HASH_CHECK"
+#define mainplaneID 1
 
 class Mavlink
 {

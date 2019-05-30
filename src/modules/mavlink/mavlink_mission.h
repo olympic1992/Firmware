@@ -93,6 +93,7 @@ private:
 	enum MAVLINK_WPM_STATES _state {MAVLINK_WPM_STATE_IDLE};	///< Current state
 	enum MAV_MISSION_TYPE _mission_type {MAV_MISSION_TYPE_MISSION};	///< mission type of current transmission (only one at a time possible)
 
+
 	uint64_t		_time_last_recv{0};
 	uint64_t		_time_last_sent{0};
 

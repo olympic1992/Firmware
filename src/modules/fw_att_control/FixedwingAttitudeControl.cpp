@@ -470,7 +470,6 @@ void FixedwingAttitudeControl::run()
 		if (fds[0].revents & POLLIN) {
 
 
-            test_data_program(true);  //调试语句,注意删除
 
 
 
@@ -1029,8 +1028,8 @@ FixedwingAttitudeControl::test_data_program(bool enable_test)
 
 
             //        设定速度初值
-            _vehicle_global_position_fake.vel_n = vx_test -1.0f; // m/s
-            _vehicle_global_position_fake.vel_e = vy_test -1.0f ; // m/s
+            _vehicle_global_position_fake.vel_n = vx_test;// -1.0f; // m/s
+            _vehicle_global_position_fake.vel_e = vy_test;// -1.0f ; // m/s
             _vehicle_global_position_fake.vel_d = vz_test;  // m/s
 
             _vehicle_global_position_fake.yaw = math::radians(yaw_test);

@@ -56,12 +56,13 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
 #include <uORB/topics/formationx.h>
-#include <uORB/topics/formationrec.h>
+#include <uORB/topics/follow_target.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 //#include <uORB/topics/offboard_control_mode.h>
@@ -82,7 +83,7 @@ using matrix::Vector2f;
 
 
 
-
+#define mainplaneID 1  //暂定主机为1号机
 
 
 using uORB::Subscription;
@@ -114,16 +115,20 @@ public:
 private:
 
     int     _att_sub{-1};
-    int     _formationrec_sub{-1};
+    int     _follow_target_sub{-1};
     int		_params_sub{-1};			/**< notification of parameter updates */
     int		_set_offboard_sub{-1};
     int		_vehicle_status_sub{-1};
     int	 _vehicle_global_position_sub{-1};
-    int	 _follow_target_sub{-1};
+    int	 _vehicle_gps_position_sub{-1};
+//    int	 _follow_target_sub{-1};
 
     int     _manual_control_setpoint_sub{-1};
 
     bool run_test{false};
+
+    bool INFO_enable{false};
+
 
 
     int mav_sysid{-1};
@@ -132,9 +137,10 @@ private:
 
 //定义编队队形:1字形,菱形,等等
     enum FORMATION_SHAPE {
-        FORMATION_1,
+        FORMATION_horizon1,
+        FORMATION_vertical1,
         FORMATION_rhombus4
-    } _form_shape_current{FORMATION_1};  //默认队形是纵向1字形
+    } _form_shape_current{FORMATION_vertical1};  //默认队形是纵向1字形
 
 
 
@@ -162,7 +168,8 @@ private:
     orb_id_t P1_send_id{nullptr};
 
     formationx_s         P1_send{}; /*自定义的编队控制结构体 */
-    formationrec_s         P1_received{}; /*从机收到的主机在之前某一时刻的位姿状态 */
+    follow_target_s         P1_received{}; /*从机收到的主机在之前某一时刻的位姿状态 */
+    vehicle_gps_position_s P1_gps_pos{};
 
 
 
@@ -191,7 +198,9 @@ private:
     param_t			_param_system_id;
     param_t			_param_component_id;
 
-    void        formationrec_sp_poll();
+    void        follow_target_sp_poll();
+
+    void        vehicle_gps_position_poll();
     void        status_poll();
 
     void        test_data_program(bool enable_test);
@@ -206,6 +215,6 @@ private:
     void        enable_follow_target_mode(bool follow_target_enabled);
     void        manual_control_setpoint_poll();
 
-    bool        check_aux_follow_sw();
+    bool        check_aux1_enable_follow();
 
 };

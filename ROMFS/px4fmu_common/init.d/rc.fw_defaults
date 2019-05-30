@@ -2,6 +2,8 @@
 
 set VEHICLE_TYPE fw
 
+
+
 if [ $AUTOCNF == yes ]
 then
 	#

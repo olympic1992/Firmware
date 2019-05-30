@@ -129,10 +129,17 @@ void LandDetector::_cycle()
 
 		_landDetected.timestamp = hrt_absolute_time();
 		_landDetected.landed = landDetected;
+
+//        _landDetected.landed = false;  //调试语句,注意删除
+
 		_landDetected.freefall = freefallDetected;
 		_landDetected.maybe_landed = maybe_landedDetected;
 		_landDetected.ground_contact = ground_contactDetected;
 		_landDetected.alt_max = alt_max;
+
+
+
+
 
 		int instance;
 		orb_publish_auto(ORB_ID(vehicle_land_detected), &_landDetectedPub, &_landDetected,

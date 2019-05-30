@@ -6,6 +6,19 @@ float32 vx			# target vel in x
 float32 vz			# target vel in z 
 uint8 est_cap # target reporting capabilities
 
-float32 roll_body				# body angle in NED frame
-float32 pitch_body				# body angle in NED frame
-float32 yaw_body				# body angle in NED frame
+float32 roll				# body angle in NED frame
+float32 pitch				# body angle in NED frame
+float32 yaw				# body angle in NED frame
+
+# formshape
+
+uint64 timestamp2
+
+uint8 FORMSHAPE_NORMAL = 0
+uint8 FORMSHAPE_HORIZON1 = 1
+uint8 FORMSHAPE_VERTIAL1 = 2
+uint8 FORMSHAPE_RHOMBUS4 = 3
+
+uint8 formshape_id                 # 飞机编队队形编号
+
+bool form_enable         # 是否开始编队

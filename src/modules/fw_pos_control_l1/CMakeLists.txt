@@ -37,7 +37,7 @@ add_subdirectory(runway_takeoff)
 px4_add_module(
 	MODULE modules__fw_pos_control_l1
 	MAIN fw_pos_control_l1
-	STACK_MAIN 1200
+        STACK_MAIN 3000
 	SRCS
 		FixedwingPositionControl.cpp
 		Landingslope.cpp
