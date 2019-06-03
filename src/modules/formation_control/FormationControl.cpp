@@ -233,7 +233,7 @@ FormationControl::send_follow_target_publish()
 bool
 FormationControl::check_aux1_enable_follow()
 {
-  return true;  //调试语句,注意删除,有遥控器时不用这句
+//  return true;  //调试语句,注意删除,有遥控器时不用这句
     manual_control_setpoint_poll();
 
 //    printf("_manual_sp.aux1 : %.2f \n",(double)_manual_sp.aux1);
