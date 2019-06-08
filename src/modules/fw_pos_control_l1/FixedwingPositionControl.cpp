@@ -698,7 +698,7 @@ bool
 FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vector2f &ground_speed,
                                            const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
-//    if(INFO_enable) PX4_INFO("control_position 程序正在运行 %.1f秒",double(hrt_absolute_time()/1000/1000));
+//    if(INFO_enable5s) PX4_INFO("control_position 程序正在运行 %.1f秒",double(hrt_absolute_time()/1000/1000));
     float dt = 0.01f;
 
     if (_control_position_last_called > 0) {
@@ -809,7 +809,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             mission_airspeed = pos_sp_curr.cruising_speed;
         }
 
+        //待办:这里的throttle_cruise巡航油门需要所有飞机统一设置.
         float mission_throttle = _parameters.throttle_cruise;
+        mission_throttle = 0.5;//这里暂定设置所有飞机的默认巡航油门为0.5;
 
         if (PX4_ISFINITE(pos_sp_curr.cruising_throttle) &&
                 pos_sp_curr.cruising_throttle > 0.01f) {
@@ -821,14 +823,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
         if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
 
-            if(INFO_enable) PX4_INFO("SETPOINT_TYPE_IDLE !");
+            if(INFO_enable5s) PX4_INFO("SETPOINT_TYPE_IDLE !");
 
             _att_sp.thrust = 0.0f;
             _att_sp.roll_body = 0.0f;
             _att_sp.pitch_body = 0.0f;
 
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-            if(INFO_enable) PX4_INFO("SETPOINT_TYPE_POSITION !");
+            if(INFO_enable5s) PX4_INFO("SETPOINT_TYPE_POSITION !");
             /* waypoint is a plain navigation waypoint */
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
             _att_sp.roll_body = _l1_control.nav_roll();
@@ -1165,12 +1167,27 @@ matrix::Vector2f FixedwingPositionControl::bodytoNED(matrix::Vector2f L_body,mat
 }
 
 
+void
+FixedwingPositionControl::INFO_enable5s_TS(){
+
+    //控制输出频率
+    static uint64_t prevsend2time = 0;
+    float dt_send2time = hrt_elapsed_time(&prevsend2time) * 1e-6f;
+    prevsend2time = hrt_absolute_time();
+    float send2HZ = 1.0f / dt_send2time;
+    static uint64_t previnfo2time{0};
+    if((hrt_elapsed_time(&previnfo2time) * 1e-6f) > 5.0f){
+        previnfo2time = prevsend2time;
+        PX4_INFO("\n\n control_follow_target周期:%6.3fs 频率:%3.1fHz",double(dt_send2time),double(send2HZ));
+        INFO_enable5s = true;
+    }
+
+
+}
 
 void
-FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
-                                                const Vector2f &air_speed_2d,const float mission_throttle,
-                                                const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
-{
+FixedwingPositionControl::INFO_enable1s_TS(){
+
     //控制输出频率
     static uint64_t prevsend2time = 0;
     float dt_send2time = hrt_elapsed_time(&prevsend2time) * 1e-6f;
@@ -1180,9 +1197,28 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     if((hrt_elapsed_time(&previnfo2time) * 1e-6f) > 1.0f){
         previnfo2time = prevsend2time;
         PX4_INFO("\n\n control_follow_target周期:%6.3fs 频率:%3.1fHz",double(dt_send2time),double(send2HZ));
-        INFO_enable = true;
+        INFO_enable1s = true;
     }
-    if(INFO_enable) PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
+
+
+}
+
+
+
+//待办,遥控器切换验证程序
+
+void
+FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
+                                                const Vector2f &air_speed_2d,const float mission_throttle,
+                                                const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
+{
+
+
+INFO_enable5s_TS();
+INFO_enable1s_TS();
+
+
+//    if(INFO_enable5s) PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
 
 
     //获得主机位置信息
@@ -1250,11 +1286,15 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     uint8_t sys_id = _vehicle_status.system_id;
     switch (MP_position.formshape_id) {
     case MP_position.FORMSHAPE_HORIZON1 :
-        if(INFO_enable) PX4_INFO(">>>>> 编队形状: 水平一字");
+//        if(INFO_enable5s) PX4_INFO(">>>>> 编队形状: 水平一字");
         L_MPtoSP = {0.0f, L_space * (sys_id-1)};
         break;
+
+
+
+
     case MP_position.FORMSHAPE_VERTIAL1  :
-        if(INFO_enable) PX4_INFO(">>>>> 编队形状: 竖直1字");
+//        if(INFO_enable5s) PX4_INFO(">>>>> 编队形状: 竖直1字");
         L_MPtoSP = {-1.0f * L_space * (sys_id-1) ,0.0f};
         break;
     case MP_position.FORMSHAPE_RHOMBUS4  :
@@ -1264,7 +1304,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                                                           {-2, 0}, // 3号机位置,主机后面
                                                           {-1,-1}  // 4号机位置,主机左边,后面
                                                    };
-        if(INFO_enable) PX4_INFO(">>>>> 编队形状: 4机菱形");
+//        if(INFO_enable5s) PX4_INFO(">>>>> 编队形状: 4机菱形");
         L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;
         L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;
         break;
@@ -1413,10 +1453,10 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     //待办:在飞行或高速运动的时候务必确认以下以上两个向量的角度,先飞主机看看
     //待办:在地面上调好飞机的距离响应和反馈,务必确认好速度的反馈
 
+    //待办:这部分速度投影的处理还需要再优化,后期可以根据从机到编队的距离来判断,当距离非常大时不使用投影,距离很小时使用投影.或者根据从机到主机的方位来判断.
     //计算在主机速度上的投影
     float dL_PtoPsp_project(math::constrain(PtoPsp_distance * MP_gndspd_ned_norm,-100.0f, 100.0f)); //注意将距离差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
     float dV_MPtoSP_project(math::constrain(MPminusSP_speed * MP_gndspd_ned_norm, -50.0f,  50.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
-//    float dV_MPtoSP_project(math::constrain(MPminusSP_speed * MP_gndspd_ned.normalized(), -50.0f,  50.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
 
 
     //这里要注意差值向量的正负
@@ -1424,7 +1464,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     float K_P(0.3f); //距离差量的增益值  这个参数要做成地面站可调的
     float K_D(0.01f); //速度差量的增益值  这个参数要做成地面站可调的
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
-
 
     //根据地速与空速数据,计算环境风速.当空速有效时起效
     static Vector2f wind_speed_ned{};
@@ -1435,11 +1474,37 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     }
     //计算目标空速
     Vector2f SP_airspd_ned_sp = SP_gndspd_ned_sp-wind_speed_ned; //目标风速矢量 = 目标地速 - 风速
-    float follow_airspeed = math::max(SP_airspd_ned_sp.length(), 6.0f);
+    float follow_airspeed = math::max(SP_airspd_ned_sp.length(), 4.0f);
+
+
+    //待办,如下验证程序等试验
+    static bool check_aux2_low_info = false;
+    if (check_aux2_SW_enable()<0){
+        if(check_aux2_low_info != true){
+            mavlink_log_info(&_mavlink_log_pub,"#启用空速截断");
+            check_aux2_low_info = true;
+        }
+        //注意:在这里设置距离前限2米,飞机超越2米时强制空速设置0,当距离落后两米后限时,恢复计算的空速
+        bool airspeed_zero_enable = false;
+        if(dL_PtoPsp_project > 2.0f) {
+            airspeed_zero_enable = false;
+        }
+        if((PtoPsp_distance.length() < 10.0f && dL_PtoPsp_project < -2.0f) || airspeed_zero_enable){
+            follow_airspeed = 0.0f;
+            airspeed_zero_enable = true;
+
+            if(INFO_enable1s)mavlink_log_info(&_mavlink_log_pub,"#距离:%.1f 速度差:%.1f",double(dL_PtoPsp_project),double(dV_MPtoSP_project));
+        }
+    } else {
+        if(check_aux2_low_info != false){
+            mavlink_log_info(&_mavlink_log_pub,"#关闭空速截断");
+            check_aux2_low_info = false;
+        }
+    }
 
     static hrt_abstime d_timestamp{0};
     if(d_timestamp != MP_position_filter.timestamp){
-        if(INFO_enable) PX4_INFO("源时间差s:%.3f",double((MP_position_filter.timestamp - d_timestamp)* 1e-6));
+//        if(INFO_enable5s) PX4_INFO("源时间差s:%.3f",double((MP_position_filter.timestamp - d_timestamp)* 1e-6));
         d_timestamp = MP_position_filter.timestamp;
     }
 
@@ -1478,32 +1543,32 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         //    mavlink_log_info(&_mavlink_log_pub, "#%d号传输超时",_vehicle_status.system_id);
 
 
-        if(INFO_enable) PX4_INFO("MP_position          .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position.alt),MP_position.lat,MP_position.lon,double(MP_position.vx),double(MP_position.vy));
-        if(INFO_enable) PX4_INFO("MP_position_filter   .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter.alt),MP_position_filter.lat,MP_position_filter.lon,double(MP_position_filter.vx),double(MP_position_filter.vy));
-        if(INFO_enable) PX4_INFO("MP_position_filter_dL.alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter_dL.alt),MP_position_filter_dL.lat,MP_position_filter_dL.lon,double(MP_position_filter_dL.vx),double(MP_position_filter_dL.vy));
-        if(INFO_enable) PX4_INFO("SP_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_position_sp.alt),SP_position_sp.lat,SP_position_sp.lon,double(SP_position_sp.vx),double(SP_position_sp.vy));
-        if(INFO_enable) PX4_INFO("SP_global_pos        .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_global_pos.alt),SP_global_pos.lat,SP_global_pos.lon,double(SP_global_pos.vel_n),double(SP_global_pos.vel_e));
-        if(INFO_enable) PX4_INFO("PB_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PB_position_sp.alt),PB_position_sp.lat,PB_position_sp.lon,double(PB_position_sp.vx),double(PB_position_sp.vy));
-        if(INFO_enable) PX4_INFO("PA_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PA_position_sp.alt),PA_position_sp.lat,PA_position_sp.lon,double(PA_position_sp.vx),double(PA_position_sp.vy));
+        if(INFO_enable5s) PX4_INFO("MP_position          .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position.alt),MP_position.lat,MP_position.lon,double(MP_position.vx),double(MP_position.vy));
+        if(INFO_enable5s) PX4_INFO("MP_position_filter   .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter.alt),MP_position_filter.lat,MP_position_filter.lon,double(MP_position_filter.vx),double(MP_position_filter.vy));
+        if(INFO_enable5s) PX4_INFO("MP_position_filter_dL.alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter_dL.alt),MP_position_filter_dL.lat,MP_position_filter_dL.lon,double(MP_position_filter_dL.vx),double(MP_position_filter_dL.vy));
+        if(INFO_enable5s) PX4_INFO("SP_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_position_sp.alt),SP_position_sp.lat,SP_position_sp.lon,double(SP_position_sp.vx),double(SP_position_sp.vy));
+        if(INFO_enable5s) PX4_INFO("SP_global_pos        .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_global_pos.alt),SP_global_pos.lat,SP_global_pos.lon,double(SP_global_pos.vel_n),double(SP_global_pos.vel_e));
+        if(INFO_enable5s) PX4_INFO("PB_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PB_position_sp.alt),PB_position_sp.lat,PB_position_sp.lon,double(PB_position_sp.vx),double(PB_position_sp.vy));
+        if(INFO_enable5s) PX4_INFO("PA_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PA_position_sp.alt),PA_position_sp.lat,PA_position_sp.lon,double(PA_position_sp.vx),double(PA_position_sp.vy));
 
 
 
-        if(INFO_enable) PX4_INFO("                      currB_sp    lat:\t%8.5f lon:\t%8.5f",double(currB_sp(0)),double(currB_sp(1)));
-        if(INFO_enable) PX4_INFO("                      prevA_sp    lat:\t%8.5f lon:\t%8.5f",double(prevA_sp(0)),double(prevA_sp(1)));
-        if(INFO_enable) PX4_INFO("                      curr_pos    lat:\t%8.5f lon:\t%8.5f",double(curr_pos(0)),double(curr_pos(1)));
-        if(INFO_enable) PX4_INFO("                                             nav_speed_2d vx:\t%4.2f vy:\t%4.2f",double(nav_speed_2d(0)),double(nav_speed_2d(1)));
+        if(INFO_enable5s) PX4_INFO("                      currB_sp    lat:\t%8.5f lon:\t%8.5f",double(currB_sp(0)),double(currB_sp(1)));
+        if(INFO_enable5s) PX4_INFO("                      prevA_sp    lat:\t%8.5f lon:\t%8.5f",double(prevA_sp(0)),double(prevA_sp(1)));
+        if(INFO_enable5s) PX4_INFO("                      curr_pos    lat:\t%8.5f lon:\t%8.5f",double(curr_pos(0)),double(curr_pos(1)));
+        if(INFO_enable5s) PX4_INFO("                                             nav_speed_2d vx:\t%4.2f vy:\t%4.2f",double(nav_speed_2d(0)),double(nav_speed_2d(1)));
 
-        if(INFO_enable) PX4_INFO("   MP_position_filter.alt:\t%4.2f follow_airspeed:\t%2.4f",double(MP_position_filter.alt),double(follow_airspeed));
-
-
+        if(INFO_enable5s) PX4_INFO("   MP_position_filter.alt:\t%4.2f follow_airspeed:\t%2.4f",double(MP_position_filter.alt),double(follow_airspeed));
 
 
 
 
-        if(INFO_enable) PX4_INFO("bear_P2Psp_P1v = %.2f",double(bear_P2Psp_P1v));
+
+
+        if(INFO_enable5s) PX4_INFO("bear_P2Psp_P1v = %.2f",double(bear_P2Psp_P1v));
 
         //输出从机的跟踪状况
-        if(INFO_enable) {
+        if(INFO_enable5s) {
             if(dL_PtoPsp_project < -0.5f) {
                 if(dL_PtoPsp_project < -10.0f)
                     PX4_INFO("超前:从机超前10米外>>>");
@@ -1519,17 +1584,17 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
             }
         }
 
-        if(INFO_enable) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(follow_airspeed),double(dL_PtoPsp_project),double(dV_MPtoSP_project));
+        if(INFO_enable5s) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(follow_airspeed),double(dL_PtoPsp_project),double(dV_MPtoSP_project));
 
 
 
-        if(INFO_enable) PX4_INFO(" MP_speed(0)= %.3f  MP_speed(1)= %.3f ",double(MP_speed(0)),double(MP_speed(1)))  ;
-        if(INFO_enable) PX4_INFO("MP_deltaL(0)= %.3f MP_deltaL(1)= %.3f ",double(MP_deltaL(0)),double(MP_deltaL(1)))  ;
+        if(INFO_enable5s) PX4_INFO(" MP_speed(0)= %.3f  MP_speed(1)= %.3f ",double(MP_speed(0)),double(MP_speed(1)))  ;
+        if(INFO_enable5s) PX4_INFO("MP_deltaL(0)= %.3f MP_deltaL(1)= %.3f ",double(MP_deltaL(0)),double(MP_deltaL(1)))  ;
 
 
         hrt_abstime now_utc_time4 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
 
-        if(INFO_enable) PX4_INFO("使用延时s:%.2f",double(dt_utc_s));
+        if(INFO_enable5s) PX4_INFO("使用延时s:%.2f",double(dt_utc_s));
 
 
         float dt_utc_s1 = (now_utc_time1-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
@@ -1539,7 +1604,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
         //总延时=传输时+程序时A    ,程序时B是这个程序段的运行时间
-        if(INFO_enable) PX4_INFO("第0延时s:%.3f 第1延时s:%.3f 第2延时s:%.3f 第3延时s:%.3f 第4延时s:%.3f",double(dt_utc_s0),double(dt_utc_s1),double(dt_utc_s2),double(dt_utc_s3),double(dt_utc_s4));
+        if(INFO_enable5s) PX4_INFO("第0延时s:%.3f 第1延时s:%.3f 第2延时s:%.3f 第3延时s:%.3f 第4延时s:%.3f",double(dt_utc_s0),double(dt_utc_s1),double(dt_utc_s2),double(dt_utc_s3),double(dt_utc_s4));
 
 
 
@@ -1547,10 +1612,35 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
 
+    if(INFO_enable5s) {
+        float dt_utc_s3 = (now_utc_time3-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+        mavlink_log_info(&_mavlink_log_pub,"延时:%.3f",double(dt_utc_s3));
+
+    }
 
 
 
 }
+
+//用aux2开关控制是否进入 followme模式,使用时需要将某个通道映射到aux2上.这里用个3段开关,位置在中间时不启用,在上下时表示两个测试状态,正.负
+int8_t
+FixedwingPositionControl::check_aux2_SW_enable()
+{
+    manual_control_setpoint_poll();
+
+    if (_manual.aux2 <= 1.2f && _manual.aux2 >= -1.2f) {  //开关范围检测
+        if (_manual.aux2 >= 0.4f){
+            return 1;
+        } else if(_manual.aux2 <= -0.4f){
+            return -1;
+        } else {
+            return 0;
+        }
+    } else {
+        return 0;
+    }
+}
+
 
 void
 FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed,
@@ -2145,7 +2235,7 @@ FixedwingPositionControl::run()
              * publish setpoint.
              */
 
-            //            if(INFO_enable) PX4_INFO("_pos_sp_triplet.current.vx = %.1f",double(_pos_sp_triplet.current.vx));
+            //            if(INFO_enable5s) PX4_INFO("_pos_sp_triplet.current.vx = %.1f",double(_pos_sp_triplet.current.vx));
 
 
             if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
@@ -2211,7 +2301,8 @@ FixedwingPositionControl::run()
 
 
 
-        INFO_enable = false;
+        INFO_enable5s = false;
+        INFO_enable1s = false;
 
     }
 }
