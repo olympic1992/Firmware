@@ -169,6 +169,7 @@ private:
 
     formationx_s         P1_send{}; /*自定义的编队控制结构体 */
     follow_target_s         P1_received{}; /*从机收到的主机在之前某一时刻的位姿状态 */
+     follow_target_s         P1_send_target{}; /*从机收到的主机在之前某一时刻的位姿状态 */
     vehicle_gps_position_s P1_gps_pos{};
 
 
@@ -216,5 +217,6 @@ private:
     void        manual_control_setpoint_poll();
 
     bool        check_aux1_enable_follow();
+    bool        check_aux3_enable_follow();
 
 };

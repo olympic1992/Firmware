@@ -559,7 +559,7 @@ then
 
 	if [ $MAVLINK_F == default ]
 	then
-		# Normal mode, use baudrate 57600 (default) and data rate 1000 bytes/s
+		# Normal mode, use baudrate 57600 (default) and data rate 1000 bytes
 		set MAVLINK_F "-r 1200"
 # 注意,上面禁用了-f功能,禁用了广播模式  ,调试使用,原句如下 set MAVLINK_F "-r 1200 -f"
 

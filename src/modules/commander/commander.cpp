@@ -2300,11 +2300,11 @@ Commander::run()
 					    && (internal_state.main_state != commander_state_s::MAIN_STATE_POSCTL)
 					    && (internal_state.main_state != commander_state_s::MAIN_STATE_RATTITUDE)
 					   ) {
-						print_reject_arm("NOT ARMING: Switch to a manual mode first.");
+                        print_reject_arm("无法解锁:请切换到一个手动模式");
 
 					} else if (!status_flags.condition_home_position_valid &&
 						   geofence_action == geofence_result_s::GF_ACTION_RTL) {
-						print_reject_arm("NOT ARMING: Geofence RTL requires valid home");
+                        print_reject_arm("无法解锁: Geofence RTL 需要有效的home点");
 
 					} else if (status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
 						arming_ret = arming_state_transition(&status, battery, safety, vehicle_status_s::ARMING_STATE_ARMED, &armed,
@@ -2313,7 +2313,7 @@ Commander::run()
 
 						if (arming_ret != TRANSITION_CHANGED) {
 							usleep(100000);
-							print_reject_arm("NOT ARMING: Preflight checks failed");
+                            print_reject_arm("无法解锁: 飞行前检查失败");
 						}
 					}
 				}
@@ -2375,7 +2375,7 @@ Commander::run()
 
 		} else {
 			if (!status_flags.rc_input_blocked && !status.rc_signal_lost) {
-				mavlink_log_critical(&mavlink_log_pub, "MANUAL CONTROL LOST (at t=%llums)", hrt_absolute_time() / 1000);
+                mavlink_log_critical(&mavlink_log_pub, "人工遥控丢失 (t=%llums)", hrt_absolute_time() / 1000);
 				status.rc_signal_lost = true;
 				rc_signal_lost_timestamp = sp_man.timestamp;
 				set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, false, status);

@@ -2516,7 +2516,7 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
 
 
     //待办:这里的编队形状是预定义的,需要做成可以根据主机信息变换的
-    temp.formshape_id = temp.FORMSHAPE_VERTIAL1;
+    temp.formshape_id = formx_rec.formshape_id;
 
 
 
@@ -2674,8 +2674,7 @@ MavlinkReceiver::receive_thread(void *arg)
 
                         if(_mavlink->get_mode() == Mavlink::MAVLINK_MODE_ONBOARD){ //调试,这一句用来禁止下面这个在onboard模式上接收
                             if(msg.msgid != 190 && msg.msgid != 4 ){
-                                PX4_INFO("MODE_ONBOARD msg.msgid : %d",msg.msgid);
-                                _mavlink->send_statustext_critical("#其他ONBOARD消息");
+                                mavlink_log_critical(_mavlink->get_mavlink_log_pub(), "#其他ONBOARD消息id%d",msg.msgid);
 
                             }
                         }
@@ -2719,8 +2718,8 @@ MavlinkReceiver::receive_thread(void *arg)
         }
 
         hrt_abstime t = hrt_absolute_time();
-        if(_mavlink->get_mode() != Mavlink::MAVLINK_MODE_ONBOARD)  //调试
-        { //调试,这一句用来禁止下面这个在onboard模式上发送
+        if(_mavlink->get_mode() != Mavlink::MAVLINK_MODE_ONBOARD)  //调试,这一句用来禁止下面这个在onboard模式上发送
+        {
             if (t - last_send_update > timeout * 1000) {
                 if (_mission_manager != nullptr) {
                     _mission_manager->check_active_mission();

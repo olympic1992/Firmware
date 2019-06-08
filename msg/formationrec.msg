@@ -13,10 +13,10 @@ float32 yaw_body				# body angle in NED frame
 
 # formshape
 
-uint8 FORMSHAPE_NORMAL = 0
-uint8 FORMSHAPE_HORIZON1 = 1
-uint8 FORMSHAPE_VERTIAL1 = 2
-uint8 FORMSHAPE_RHOMBUS4 = 3
+# uint8 FORMSHAPE_NORMAL = 0
+# uint8 FORMSHAPE_HORIZON1 = 1
+# uint8 FORMSHAPE_VERTIAL1 = 2
+# uint8 FORMSHAPE_RHOMBUS4 = 3
 
 uint8 formshape_id                 # 飞机编队队形编号
 

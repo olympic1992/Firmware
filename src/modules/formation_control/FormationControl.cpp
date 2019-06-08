@@ -247,6 +247,25 @@ FormationControl::check_aux1_enable_follow()
         return false;
 }
 
+//用aux3开关控制是否切换编队队形
+bool
+FormationControl::check_aux3_enable_follow()
+{
+//  return true;  //调试语句,注意删除,有遥控器时不用这句
+    manual_control_setpoint_poll();
+
+//    printf("_manual_sp.aux3 : %.2f \n",(double)_manual_sp.aux3);
+    if (_manual_sp.aux3 <= 1.2f && _manual_sp.aux3 >= -1.2f) {
+        if (_manual_sp.aux3 >= 0.5f){
+            return true;
+        } else {
+            return false;
+        }
+    } else
+        return false;
+}
+
+
 
 
 
@@ -389,7 +408,7 @@ void FormationControl::run()
 
         if((sys_id != mainplaneID)){
             enable_follow_target_mode(check_aux1_enable_follow()); //这一段预留:使从机进入follow_target模式  //试验时,程序和遥控器共同实现
-            sleep(1);
+
         }
         //待办:注意,这部分仅处理编队命令
 
@@ -417,6 +436,7 @@ void FormationControl::run()
         }
 
         if ((fds[0].revents & POLLIN) != 0) {
+
             if(debug_enable){
                 mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号有定位",sys_id);
                 debug_enable = false;
@@ -435,17 +455,27 @@ void FormationControl::run()
 
 
                 //待办:在这里增加编队队形控制的命令语句
+
+                if(check_aux3_enable_follow()){
+                    P1_send.formshape_id = P1_send_target.FORMSHAPE_HORIZON1;
+                    //                 mavlink_log_info(&_mavlink_log_pub,"#主机水平一字编队");
+                }else{
+                    P1_send.formshape_id = P1_send_target.FORMSHAPE_VERTIAL1;
+                    //                    mavlink_log_info(&_mavlink_log_pub,"#主机竖直1字编队");
+                }
+
                 formationx_sp_publish();  //将主机数据推送到主机的uorb总线上,然后由mavlink发送出去
-                sleep(1);
+                usleep(10000);//每一句都要延时,防止不能上传航线
 
             } else if((sys_id <= 4 && sys_id >= 1)){ //说明当前飞机是从机,并且遥控器上的编队开关启用了,此时要根据从机编号做相应操作
-                sleep(1);
+
+                usleep(10000);//每一句都要延时,防止不能上传航线
 
             } else {
                 if(status_valid) { //当程序poll到的status数据有效时,才根据这个数据执行程序,避免初始值对程序造成不必要影响
                     PX4_ERR("sys_id = %d 从机status.system_id编号错误,不能继续执行,程序目前最多支持4机编队,请修改status.system_id为1~4之间的值!",sys_id);
                 }
-                sleep(1);
+                usleep(10000);//每一句都要延时,防止不能上传航线
             }
         }
 

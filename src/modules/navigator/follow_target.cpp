@@ -175,11 +175,20 @@ void FollowTarget::on_active()
         pos_sp_triplet->previous.valid = true ;
         pos_sp_triplet->current.valid = true ;
 
+
+        pos_sp_triplet->current.home_alt = _navigator->get_home_position()->alt;
+
+
+        pos_sp_triplet->current.alt += 40.0f; // if min clearance is bad set it to 40.0 meters (well above the average height of a person)
+
+
+
+
         _navigator->set_position_setpoint_triplet_updated();
 
 
     } else if (((current_time - last_updated_time) / 1000) > TARGET_TIMEOUT_MS) {  //如果一段时间没有获得目标更新
-        if(info_enable) PX4_INFO("没有获得主机发来的follow_target主题");
+        if(info_enable) mavlink_log_info(_navigator->get_mavlink_log_pub(),"#没有获得主机发来的follow_target主题");
 
         if(_target_updates >=1){
             reset_target_validity();

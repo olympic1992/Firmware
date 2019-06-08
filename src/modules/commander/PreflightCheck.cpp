@@ -238,7 +238,7 @@ static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	if (sensors.mag_inconsistency_ga > test_limit) {
 		if (report_status) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障:磁传感器不一致",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障:磁传感器不一致,建议复位fmu或禁用内置磁力计",status.system_id);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, status);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, status);
 		}

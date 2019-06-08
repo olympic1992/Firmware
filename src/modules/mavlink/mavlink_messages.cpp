@@ -4226,6 +4226,7 @@ protected:
                 // 待办:           这里预留发送编队控制命令的位置,使用formuorb的内容
                 formationx_s formuorb = {};
                 _formationx_sub->update(&formuorb);
+                msg.formshape_id = formuorb.formshape_id;
 
             }
 

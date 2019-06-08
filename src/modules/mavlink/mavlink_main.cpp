@@ -2267,12 +2267,10 @@ Mavlink::task_main(int argc, char *argv[])
 				current_command_ack = command_ack.command;
 
 				// TODO: always transmit the acknowledge once it is only sent over the instance the command is received
-				//bool _transmitting_enabled_temp = _transmitting_enabled;
-                //_transmitting_enabled = true;
-                if(get_mode() != Mavlink::MAVLINK_MODE_ONBOARD) {  //调试,在onboard模式禁用
+
+                if(_mode != Mavlink::MAVLINK_MODE_ONBOARD){ //调试,这一句用来禁止下面这个在onboard模式上发送
                     mavlink_msg_command_ack_send_struct(get_channel(), &msg);
                 }
-				//_transmitting_enabled = _transmitting_enabled_temp;
 			}
 		}
 
