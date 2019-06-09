@@ -1548,60 +1548,80 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     float chaosu_L = 0.0f;
 
+    //注意:在这里设置距离前限飞机超越2米时强制空速设置0,和油门设置0,当距离落后两米后限时,恢复计算的空速
+    bool airspeed_zero_enable = false;
+    if(dL_PtoPsp_project > 0.8f) {
+        airspeed_zero_enable = false;
+        chaosu_L = 0.0f;
+        follow_throttle_sp = mission_throttle;
+    }
+    if((PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project < -0.8f) || airspeed_zero_enable){
+        follow_airspeed = 0.5f * mission_throttle;
+        follow_throttle_sp = 0.01f;
+        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#减油门");
+        airspeed_zero_enable = true;
+    }
+    if((PtoPsp_distance.length() < 10.0f && dL_PtoPsp_project < -4.0f)){
+        chaosu_L = 3.0f;   //从机超前时稍微提高目标高度
+    }
+
+    float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+    //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
+    float dL_PtoPsp_across = PtoPsp_distance % MP_gndspd_ned_norm;
+    if((dL_PtoPsp_project < 5.0f && dL_PtoPsp_project > -6.0f) && (dL_PtoPsp_across > -5.0f && dL_PtoPsp_across < 5.0f)){
+        juli_L = 1.0f;//留一米间隔
+    }
+
+
+    //    待办:这里可以加一个对高度的处理,当飞行器很接近目标位置时提高高度进入编队
+    //  home_alt_valid() ? _home_pos.alt + 40.0f : MP_position_filter.alt -10.0f,  //调试,注意这里是用了home高度 待办:注意所有飞机起飞前应在同一高度解锁
+    float follow_alt_sp = max(MP_position_filter.alt - juli_L + chaosu_L, pos_sp_curr.home_alt + 42.0f);//_home_pos.alt + 100.0f;
+
     //待办,如下验证程序等试验
     static bool check_aux2_low_info = false;
     if (check_aux2_SW_enable()<= 0){
         if(check_aux2_low_info != true){
-            mavlink_log_info(&_mavlink_log_pub,"#启用爬高");
+            mavlink_log_info(&_mavlink_log_pub,"#启用功能");
             check_aux2_low_info = true;
         }
-        //注意:在这里设置距离前限2米,飞机超越2米时强制空速设置0,当距离落后两米后限时,恢复计算的空速
-        bool airspeed_zero_enable = false;
-        if(dL_PtoPsp_project > 2.0f) {
-            airspeed_zero_enable = false;
-            chaosu_L = 0.0f;
-            follow_throttle_sp = mission_throttle;
-        }
-        if((PtoPsp_distance.length() < 10.0f && dL_PtoPsp_project < -2.0f) || airspeed_zero_enable){
-            follow_airspeed = 0.0f;
-//             chaosu_L = 4.0f;   //从机超前时稍微提高目标高度
-             if(check_aux2_SW_enable() < 0){
-                 follow_throttle_sp = 0.01f;
-                 if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#启用减速");
-             }
-            airspeed_zero_enable = true;
 
-//            if(INFO_enable1s)mavlink_log_info(&_mavlink_log_pub,"#距离:%.0f 速度差:%.0f",double(dL_PtoPsp_project),double(dV_MPtoSP_project));
-        }
+
+
+        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#高差%.0f",double(juli_L));
+//        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#目标%.0f",double(follow_alt_sp - pos_sp_curr.home_alt));
+        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"目标%.0f,高差%.0f,超速%.0f,home%.0f",
+                                          double(MP_position_filter.alt),double(juli_L),double(chaosu_L),double(pos_sp_curr.home_alt));
+
+
+
+
+
+
     } else {
         if(check_aux2_low_info != false){
             mavlink_log_info(&_mavlink_log_pub,"#关闭功能");
             check_aux2_low_info = false;
         }
+       if(INFO_enable3s) mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
+
     }
 
     static hrt_abstime d_timestamp{0};
     if(d_timestamp != MP_position_filter.timestamp){
-//        if(INFO_enable3s) PX4_INFO("源时间差s:%.3f",double((MP_position_filter.timestamp - d_timestamp)* 1e-6));
+        //        if(INFO_enable3s) PX4_INFO("源时间差s:%.3f",double((MP_position_filter.timestamp - d_timestamp)* 1e-6));
         d_timestamp = MP_position_filter.timestamp;
     }
 
-
-//    home_position_update(true);  //定时更新home点位置
-
     if(INFO_enable3s) {
-        mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速度差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
+//        mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速度差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
     }
 
 
-    //    待办:这里可以加一个对高度的处理,当飞行器很接近目标位置时提高高度进入编队
-//  home_alt_valid() ? _home_pos.alt + 40.0f : MP_position_filter.alt -10.0f,  //调试,注意这里是用了home高度 待办:注意所有飞机起飞前应在同一高度解锁
-    float follow_alt_sp = max(MP_position_filter.alt - 6.0f + chaosu_L, pos_sp_curr.home_alt + 42.0f);//_home_pos.alt + 100.0f;
+
 
     //待办,注意这里使用的home的高度可能不对
 
-//    if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#home高%.0f",double(pos_sp_curr.home_alt));
-   if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"高度目标%.0f",double(follow_alt_sp));
+
 
 
 
