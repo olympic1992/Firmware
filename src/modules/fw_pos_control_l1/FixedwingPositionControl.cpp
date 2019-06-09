@@ -1541,7 +1541,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     }
     //计算目标空速
     Vector2f SP_airspd_ned_sp = SP_gndspd_ned_sp-wind_speed_ned; //目标风速矢量 = 目标地速 - 风速
-    float follow_airspeed = math::max(SP_airspd_ned_sp.length(), _parameters.airspeed_min);
+    float airspeed_follow = math::max(SP_airspd_ned_sp.length(), _parameters.airspeed_min);
 
 
     float follow_throttle_sp = mission_throttle;
@@ -1556,8 +1556,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         follow_throttle_sp = mission_throttle;
     }
     if((PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project < -0.8f) || airspeed_zero_enable){
-        follow_airspeed = 0.5f * mission_throttle;
-        follow_throttle_sp = 0.01f;
+        follow_throttle_sp = 0.3f * mission_throttle;
+        airspeed_follow = 0.01f;
         if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#减油门");
         airspeed_zero_enable = true;
     }
@@ -1627,7 +1627,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     tecs_update_pitch_throttle(follow_alt_sp,
-                               calculate_target_airspeed(follow_airspeed),
+                               calculate_target_airspeed(airspeed_follow),
                                radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
                                radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
                                _parameters.throttle_min,
@@ -1669,7 +1669,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         if(INFO_enable3s) PX4_INFO("                      curr_pos    lat:\t%8.5f lon:\t%8.5f",double(curr_pos(0)),double(curr_pos(1)));
         if(INFO_enable3s) PX4_INFO("                                             nav_speed_2d vx:\t%4.2f vy:\t%4.2f",double(nav_speed_2d(0)),double(nav_speed_2d(1)));
 
-        if(INFO_enable3s) PX4_INFO("   MP_position_filter.alt:\t%4.2f follow_airspeed:\t%2.4f",double(MP_position_filter.alt),double(follow_airspeed));
+        if(INFO_enable3s) PX4_INFO("   MP_position_filter.alt:\t%4.2f airspeed_follow:\t%2.4f",double(MP_position_filter.alt),double(airspeed_follow));
 
 
 
@@ -1680,7 +1680,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
 
-        if(INFO_enable3s) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(follow_airspeed),double(dL_PtoPsp_project),double(dV_MPtoSP_project));
+        if(INFO_enable3s) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(airspeed_follow),double(dL_PtoPsp_project),double(dV_MPtoSP_project));
 
 
 
