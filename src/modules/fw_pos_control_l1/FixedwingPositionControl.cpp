@@ -1522,13 +1522,13 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //待办:这部分速度投影的处理还需要再优化,后期可以根据从机到编队的距离来判断,当距离非常大时不使用投影,距离很小时使用投影.或者根据从机到主机的方位来判断.
     //计算在主机速度上的投影
-    float dL_PtoPsp_project(math::constrain(PtoPsp_distance * MP_gndspd_ned_norm,-100.0f, 100.0f)); //注意将距离差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
-    float dV_MPtoSP_project(math::constrain(MPminusSP_speed * MP_gndspd_ned_norm, -50.0f,  50.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
+    float dL_PtoPsp_project(math::constrain(PtoPsp_distance * MP_gndspd_ned_norm,-50.0f, 50.0f)); //注意将距离差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
+    float dV_MPtoSP_project(math::constrain(MPminusSP_speed * MP_gndspd_ned_norm,-30.0f, 30.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_gndspd_ned溢出
 
 
     //这里要注意差值向量的正负
 
-    float K_P(0.6f); //距离差量的增益值  这个参数要做成地面站可调的
+    float K_P(0.8f); //距离差量的增益值  这个参数要做成地面站可调的
     float K_D(0.02f); //速度差量的增益值  这个参数要做成地面站可调的
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
