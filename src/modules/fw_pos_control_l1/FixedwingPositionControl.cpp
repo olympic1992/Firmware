@@ -1538,6 +1538,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     Vector2f SP_airspd_ned_sp = SP_gndspd_ned_sp-wind_speed_ned; //目标风速矢量 = 目标地速 - 风速
     float airspeed_follow = math::max(SP_airspd_ned_sp.length(), _parameters.airspeed_min);
 
+    //待办:主机设置的最小空速要大于从机的最小空速4m/s
+
 
     float follow_throttle_sp = mission_throttle;
 
@@ -1551,10 +1553,10 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         follow_throttle_sp = mission_throttle;
     }
     if(PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project > 2.0f){
-        follow_throttle_sp = max(2.0f * mission_throttle,_parameters.throttle_max);
+        follow_throttle_sp = 0.85f;
     }
     if((PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project < -0.8f) || airspeed_zero_enable){
-        follow_throttle_sp = 0.01f * mission_throttle;
+        follow_throttle_sp = 0.01f;
         airspeed_follow = 0.01f;
         if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#减油门");
         airspeed_zero_enable = true;
@@ -1577,7 +1579,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     _att_sp.roll_body = _l1_control.nav_roll();
     _att_sp.yaw_body = _l1_control.nav_bearing();
 
-    //如果飞机的侧偏距在一定范围内,就启用2倍纠偏权限
+    //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用2倍纠偏权限
     if(PtoPsp_distance.length() < 7.0f){ //条件1
         if(dL_PtoPsp_across > -4.0f && dL_PtoPsp_across < 4.0f){ //条件2
             if(dL_PtoPsp_across < -1.0f && dL_PtoPsp_across > 1.0f){ //条件3
@@ -1594,61 +1596,13 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         juli_L = 0.0f;//加入编队
     }
 
-
-
-
     //    待办:这里可以加一个对高度的处理,当飞行器很接近目标位置时提高高度进入编队
     //  home_alt_valid() ? _home_pos.alt + 40.0f : MP_position_filter.alt -10.0f,  //调试,注意这里是用了home高度 待办:注意所有飞机起飞前应在同一高度解锁
     float follow_alt_sp = max(MP_position_filter.alt - juli_L + chaosu_L, pos_sp_curr.home_alt + 42.0f);//_home_pos.alt + 100.0f;
 
-    //待办,如下验证程序等试验
-    static bool check_aux2_low_info = false;
-    if (check_aux2_SW_enable()<= 0){
-        if(check_aux2_low_info != true){
-            mavlink_log_info(&_mavlink_log_pub,"#启用功能");
-            check_aux2_low_info = true;
-        }
-
-
-
-        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#高差%.0f",double(juli_L));
-//        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#目标%.0f",double(follow_alt_sp - pos_sp_curr.home_alt));
-        if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"目标%.0f,高差%.0f,超速%.0f,home%.0f",
-                                          double(MP_position_filter.alt),double(juli_L),double(chaosu_L),double(pos_sp_curr.home_alt));
-
-
-
-
-
-
-    } else {
-        if(check_aux2_low_info != false){
-            mavlink_log_info(&_mavlink_log_pub,"#关闭功能");
-            check_aux2_low_info = false;
-        }
-       if(INFO_enable3s) mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
-
-    }
-
-    static hrt_abstime d_timestamp{0};
-    if(d_timestamp != MP_position_filter.timestamp){
-        //        if(INFO_enable3s) PX4_INFO("源时间差s:%.3f",double((MP_position_filter.timestamp - d_timestamp)* 1e-6));
-        d_timestamp = MP_position_filter.timestamp;
-    }
-
-    if(INFO_enable3s) {
-//        mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速度差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
-    }
-
-
-
+    if(INFO_enable3s) mavlink_log_info(&_mavlink_log_pub,"#纵%.0f 横%.0f 速差%.0f",double(dL_PtoPsp_project),double(PtoPsp_distance % MP_gndspd_ned_norm),double(dV_MPtoSP_project));
 
     //待办,注意这里使用的home的高度可能不对
-
-
-
-
-
 
     tecs_update_pitch_throttle(follow_alt_sp,
                                calculate_target_airspeed(airspeed_follow),
