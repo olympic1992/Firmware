@@ -1492,11 +1492,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
 
 
-
-    _l1_control.navigate_followme(prevA_sp, currB_sp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
-    _att_sp.roll_body = _l1_control.nav_roll();
-    _att_sp.yaw_body = _l1_control.nav_bearing();
-
     /******************************************* 这部分进行纵向控制 **************************************************************************/
 
     //计算位置差
@@ -1529,7 +1524,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     //这里要注意差值向量的正负
 
     float K_P(0.8f); //距离差量的增益值  这个参数要做成地面站可调的
-    float K_D(0.02f); //速度差量的增益值  这个参数要做成地面站可调的
+    float K_D(0.01f); //速度差量的增益值  这个参数要做成地面站可调的
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
     //根据地速与空速数据,计算环境风速.当空速有效时起效
@@ -1550,13 +1545,16 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //注意:在这里设置距离前限飞机超越2米时强制空速设置0,和油门设置0,当距离落后两米后限时,恢复计算的空速
     bool airspeed_zero_enable = false;
-    if(dL_PtoPsp_project > 0.8f) {
+    if(dL_PtoPsp_project > 0.0f) {
         airspeed_zero_enable = false;
         chaosu_L = 0.0f;
         follow_throttle_sp = mission_throttle;
     }
+    if(PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project > 2.0f){
+        follow_throttle_sp = max(2.0f * mission_throttle,_parameters.throttle_max);
+    }
     if((PtoPsp_distance.length() < 8.0f && dL_PtoPsp_project < -0.8f) || airspeed_zero_enable){
-        follow_throttle_sp = 0.3f * mission_throttle;
+        follow_throttle_sp = 0.01f * mission_throttle;
         airspeed_follow = 0.01f;
         if(INFO_enable3s)mavlink_log_info(&_mavlink_log_pub,"#减油门");
         airspeed_zero_enable = true;
@@ -1565,12 +1563,38 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         chaosu_L = 3.0f;   //从机超前时稍微提高目标高度
     }
 
-    float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+
     //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
+
+
     float dL_PtoPsp_across = PtoPsp_distance % MP_gndspd_ned_norm;
-    if((dL_PtoPsp_project < 5.0f && dL_PtoPsp_project > -6.0f) && (dL_PtoPsp_across > -5.0f && dL_PtoPsp_across < 5.0f)){
-        juli_L = 1.0f;//留一米间隔
+
+
+
+    /******************************************* 这部分进行横向控制和修正 **************************************************************************/
+    //放在这里主要是为了使用上面计算出来的侧偏距
+    _l1_control.navigate_followme(prevA_sp, currB_sp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
+    _att_sp.roll_body = _l1_control.nav_roll();
+    _att_sp.yaw_body = _l1_control.nav_bearing();
+
+    //如果飞机的侧偏距在一定范围内,就启用2倍纠偏权限
+    if(PtoPsp_distance.length() < 7.0f){ //条件1
+        if(dL_PtoPsp_across > -4.0f && dL_PtoPsp_across < 4.0f){ //条件2
+            if(dL_PtoPsp_across < -1.0f && dL_PtoPsp_across > 1.0f){ //条件3
+                _att_sp.roll_body = 2.0f * _att_sp.roll_body;
+                _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-60.0f), radians(60.0f));  //限制范围为±70
+            }
+        }
     }
+
+
+    //这一段是使用水平距离判断是否需要进行安全保护
+    float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+    if((dL_PtoPsp_project < 5.0f && dL_PtoPsp_project > -6.0f) && (dL_PtoPsp_across > -4.0f && dL_PtoPsp_across < 4.0f)){
+        juli_L = 0.0f;//加入编队
+    }
+
+
 
 
     //    待办:这里可以加一个对高度的处理,当飞行器很接近目标位置时提高高度进入编队

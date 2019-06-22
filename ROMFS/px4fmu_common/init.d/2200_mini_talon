@@ -62,7 +62,7 @@ fi
 	# 磁力计3面校准
 	param set CAL_MAG_SIDES 38
 	param set SYS_COMPANION 57600
-	set BAT_N_CELLS 4
+	param set BAT_N_CELLS 4
 	# 电量低时设置return mode
 	param set COM_LOW_BAT_ACT 1
 	param set FW_THR_CRUISE 0.5
@@ -70,7 +70,8 @@ fi
 	param set NAV_LOITER_RAD 70
 	param set RTL_RETURN_ALT 60
 	param set RTL_DESCEND_ALT 50
-	set FW_T_SPDWEIGHT 0.7
+	param set FW_T_SPDWEIGHT 0.7
+	param set COM_DISARM_LAND 1
 
 
 
