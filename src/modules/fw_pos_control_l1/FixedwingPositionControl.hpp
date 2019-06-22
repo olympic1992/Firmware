@@ -164,7 +164,7 @@ private:
     home_position_s					_home_pos{};		/**< home position for RTL */
     int		_home_pos_sub{-1};		/**< home position subscription */
 
-    bool INFO_enable3s{false};
+    bool INFO_enable_1s{false};
         bool INFO_enable1s{false};
 
 	int		_global_pos_sub{-1};
@@ -472,7 +472,7 @@ Vector2f Psp2A_offset_ned{};
     matrix::Vector2f bodytoNED(matrix::Vector2f L_body,matrix::Vector2f speed_ned, float yaw);
 
 
-   void INFO_enable3s_TS();
+   void INFO_enable_1s_TS();
      void INFO_enable1s_TS();
 
 
