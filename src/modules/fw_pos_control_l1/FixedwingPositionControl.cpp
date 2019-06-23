@@ -1280,7 +1280,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 //    MP_position.formshape_id;
     //这里做个状态机
-    static uint8_t _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1;
+    static uint8_t _form_shape_current =  MP_position.FORMSHAPE_HORIZON1;
 
 //    switch(MP_position.formshape_id){
 //    case MP_position.FORMSHAPE_HORIZON1 :
@@ -1491,8 +1491,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //这里要注意差值向量的正负
 
-    float K_P(2.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的
-    float K_D(1.2f); //速度差量的增益值  待办,这个参数要做成地面站可调的
+    float K_P(2.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的,注意,参数为2时3号机也能飞,不建议再继续增大了,下次调试改成1.5试试
+    float K_D(1.2f); //速度差量的增益值  待办,这个参数要做成地面站可调的,注意,这个值先保持1.2,目前问题是当通信频率不高时这个值是否有效
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
     //根据地速与空速数据,计算环境风速.当空速有效时起效
@@ -1514,7 +1514,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     //注意:在这里设置TECS的油门参考值,通过参考值的设定更迅速调整飞机的速度
-    float Control_thr_L = 2.0f;//油门比例控制范围
+    float Control_thr_L = 3.0f;//油门比例控制范围
     float THR_outofrange = 0.95f;//超出比例控制范围后的油门
     if(PtoPsp_distance.length() < 12.0f){
         if(dL_PtoPsp_project < 0.0f){ //当飞机超前的时候务必减速
@@ -1555,18 +1555,33 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
         //以下两种模式,等测试
         static int8_t last_check_aux2_SW_enable = 0;
         int8_t now_check_aux2_SW_enable = check_aux2_SW_enable();
-        if(now_check_aux2_SW_enable){
+
+        if(true){
             if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
                 mavlink_log_info(&_mavlink_log_pub,"#第一状态") //注意:这个控制模式追踪的最好
             }
-            if(fabs(double(dL_PtoPsp_across)) > 1.0){ //条件2 //注意:这个值是1的时候是上次正常状态
-                _att_sp.roll_body = 5.0f * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+
+            const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
+            if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
+                _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+                //上次调试,飞机侧偏控制容易超调,想办法减缓,试试对侧偏距开根号
             }
         } else {
             if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
                 mavlink_log_info(&_mavlink_log_pub,"#第二状态")
             }
-            _att_sp.roll_body = _att_sp.roll_body * _att_sp.roll_body;
+            if(0){  //待办,注意这里的测试
+                _att_sp.roll_body = _att_sp.roll_body * float(fabs(double(_att_sp.roll_body)));
+            }else{
+                _att_sp.roll_body = math::radians(0.5f * math::degrees(_att_sp.roll_body) * float(fabs(double(math::degrees(_att_sp.roll_body)))));
+
+//                float rectify_ROLL_range = 5.0f;  //超过范围值,就会启用强制纠偏算法
+//                if(_att_sp.roll_body>0.0f){
+//                    _att_sp.roll_body = float(fmax(double(_att_sp.roll_body),double(1.0f/rectify_ROLL_range * _att_sp.roll_body * float(fabs(double(_att_sp.roll_body))))));
+//                }else{
+//                    _att_sp.roll_body = float(fmin(double(_att_sp.roll_body),double(1.0f/rectify_ROLL_range * _att_sp.roll_body * float(fabs(double(_att_sp.roll_body))))));
+//                }
+            }
         }
         last_check_aux2_SW_enable = now_check_aux2_SW_enable;
 
