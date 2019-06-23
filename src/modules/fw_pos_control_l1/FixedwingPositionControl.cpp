@@ -1522,7 +1522,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     //这里要注意差值向量的正负
 
     float K_P(2.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的
-    float K_D(0.5f); //速度差量的增益值  待办,这个参数要做成地面站可调的
+    float K_D(0.8f); //速度差量的增益值  待办,这个参数要做成地面站可调的
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
     //根据地速与空速数据,计算环境风速.当空速有效时起效
@@ -1586,13 +1586,13 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                 if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
                     mavlink_log_info(&_mavlink_log_pub,"#第一状态")
                 }
-                _att_sp.roll_body = 10.0f * _att_sp.roll_body;
+                _att_sp.roll_body = 5.0f * _att_sp.roll_body;
 
             } else {
                 if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
                     mavlink_log_info(&_mavlink_log_pub,"#第二状态")
                 }
-                _att_sp.roll_body = dL_PtoPsp_across / 8.0f * -60.0f;
+                _att_sp.roll_body = dL_PtoPsp_across / 8.0f * 60.0f;
             }
             last_check_aux2_SW_enable = now_check_aux2_SW_enable;
 
