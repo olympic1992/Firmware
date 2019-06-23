@@ -1577,22 +1577,22 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用2倍纠偏权限
     if(dL_PtoPsp_project < 10.0f && dL_PtoPsp_project > -4.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        if(fabs(double(dL_PtoPsp_across)) > 1.0){ //条件2
+        if(fabs(double(dL_PtoPsp_across)) > 0.3){ //条件2 //注意:这个值是1的时候是上次正常状态
 
             //以下两种模式,等测试
             static int8_t last_check_aux2_SW_enable = 0;
             int8_t now_check_aux2_SW_enable = check_aux2_SW_enable();
             if(now_check_aux2_SW_enable){
                 if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
-                    mavlink_log_info(&_mavlink_log_pub,"#第一状态")
+                    mavlink_log_info(&_mavlink_log_pub,"#第一状态") //注意:这个控制模式追踪的最好
                 }
-                _att_sp.roll_body = 5.0f * _att_sp.roll_body;
+                _att_sp.roll_body = 4.0f * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
 
             } else {
                 if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
                     mavlink_log_info(&_mavlink_log_pub,"#第二状态")
                 }
-                _att_sp.roll_body = dL_PtoPsp_across / 8.0f * 60.0f;
+                _att_sp.roll_body = dL_PtoPsp_across / 8.0f * -30.0f; //注意,这个值确实应该是负值,并且-60值太大了,所以改成了-30
             }
             last_check_aux2_SW_enable = now_check_aux2_SW_enable;
 
