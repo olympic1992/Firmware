@@ -1455,39 +1455,9 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
 
-
-    // 这一段用来计算飞机的yaw设置点,暂时不用,之后再看
-    //    // get distance to target
-    //    Vector2f  _target_distance{};
-    //    map_projection_init(&target_ref, SP_gps_pos.lat, SP_gps_pos.lon);
-    //    map_projection_project(&target_ref, SP_position_sp.lat, SP_position_sp.lon,
-    //                           &_target_distance(0),&_target_distance(1));
-
-    //    float yaw_angle_sp;
-    //    if ((_target_distance).length() > 30.0F) { //飞机距离目标位置较远
-    //        // yaw rate filtering
-    //        // this really needs to control the yaw rate directly in the attitude pid controller
-    //        // but seems to work ok for now since the yaw rate cannot be controlled directly in auto mode
-    //        yaw_angle_sp = get_bearing_to_next_waypoint(SP_gps_pos.lat,SP_gps_pos.lon,
-    //                                                    SP_position_sp.lat,SP_position_sp.lon);
-    //    } else {
-    //        yaw_angle_sp = NAN;
-    //    }
-
-    //    SP_position_sp.yaw = yaw_angle_sp;
-
-
-
-
-
-    //开始横航向计算
-
-
     hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
 
-    //提取A点和B点坐标
-    Vector2f currB_sp = {float(PB_position_sp.lat), float(PB_position_sp.lon)};
-    Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
+
 
 
     /******************************************* 这部分进行纵向控制 **************************************************************************/
@@ -1522,7 +1492,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     //这里要注意差值向量的正负
 
     float K_P(2.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的
-    float K_D(0.8f); //速度差量的增益值  待办,这个参数要做成地面站可调的
+    float K_D(1.2f); //速度差量的增益值  待办,这个参数要做成地面站可调的
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
     //根据地速与空速数据,计算环境风速.当空速有效时起效
@@ -1570,6 +1540,10 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     /******************************************* 这部分进行横向控制和修正 **************************************************************************/
+    //开始横航向计算
+//提取A点和B点坐标
+Vector2f currB_sp = {float(PB_position_sp.lat), float(PB_position_sp.lon)};
+Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
     //放在这里主要是为了使用上面计算出来的侧偏距
     _l1_control.navigate_followme(prevA_sp, currB_sp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
     _att_sp.roll_body = _l1_control.nav_roll();
@@ -1577,36 +1551,36 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用2倍纠偏权限
     if(dL_PtoPsp_project < 10.0f && dL_PtoPsp_project > -4.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        if(fabs(double(dL_PtoPsp_across)) > 0.3){ //条件2 //注意:这个值是1的时候是上次正常状态
 
-            //以下两种模式,等测试
-            static int8_t last_check_aux2_SW_enable = 0;
-            int8_t now_check_aux2_SW_enable = check_aux2_SW_enable();
-            if(now_check_aux2_SW_enable){
-                if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
-                    mavlink_log_info(&_mavlink_log_pub,"#第一状态") //注意:这个控制模式追踪的最好
-                }
-                _att_sp.roll_body = 4.0f * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
-
-            } else {
-                if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
-                    mavlink_log_info(&_mavlink_log_pub,"#第二状态")
-                }
-                _att_sp.roll_body = dL_PtoPsp_across / 8.0f * -30.0f; //注意,这个值确实应该是负值,并且-60值太大了,所以改成了-30
+        //以下两种模式,等测试
+        static int8_t last_check_aux2_SW_enable = 0;
+        int8_t now_check_aux2_SW_enable = check_aux2_SW_enable();
+        if(now_check_aux2_SW_enable){
+            if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
+                mavlink_log_info(&_mavlink_log_pub,"#第一状态") //注意:这个控制模式追踪的最好
             }
-            last_check_aux2_SW_enable = now_check_aux2_SW_enable;
-
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-60.0f), radians(60.0f));  //限制范围
-
+            if(fabs(double(dL_PtoPsp_across)) > 1.0){ //条件2 //注意:这个值是1的时候是上次正常状态
+                _att_sp.roll_body = 5.0f * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+            }
+        } else {
+            if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){
+                mavlink_log_info(&_mavlink_log_pub,"#第二状态")
+            }
+            _att_sp.roll_body = _att_sp.roll_body * _att_sp.roll_body;
         }
+        last_check_aux2_SW_enable = now_check_aux2_SW_enable;
+
+        _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-50.0f), radians(50.0f));  //限制范围
+
+
     }
 
 
     //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
     //这一段是使用水平距离判断是否需要进行降高度保护
-    float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+    float juli_L = 4.0f * float(sys_id-1);  //根据各机编号确定安全间隔
     if((dL_PtoPsp_project < 8.0f && dL_PtoPsp_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
-        juli_L = 2.0f * float(sys_id-1);//加入编队,也有一定的安全间隔
+        juli_L = 1.0f * float(sys_id-1);//加入编队,也有一定的安全间隔
     }
 
     //    待办:这里可以加一个对高度的处理,当飞行器很接近目标位置时提高高度进入编队
