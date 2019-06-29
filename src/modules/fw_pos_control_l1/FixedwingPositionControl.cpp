@@ -1268,58 +1268,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     Vector2f MP_gndspd_ned = {MP_position_filter.vx,MP_position_filter.vy};    //收到的主机的速度.单位 m/s
 
 
-    //            /*待办:这一段预留:增加编队变换的控制程序,要想办法写的简洁易懂*/
-    //            //输入,主机指令(或人工控制指令)
-    //            //根据当前队形编号和目标队形编号,分时间输出不同的编队队形编号,要包括过渡队形编号.
-    //            //输出,编队队形编号_form_shape_current
-
-    //            //待办:在这加个遥控器开关,做一个手动编队变换,测试用
-
-
-    //            //待办:编队变换的过程要在这里设计一下
-
-//    MP_position.formshape_id;
-    //这里做个状态机
-    static uint8_t _form_shape_current =  MP_position.FORMSHAPE_HORIZON1;
-
-//    switch(MP_position.formshape_id){
-//    case MP_position.FORMSHAPE_HORIZON1 :
-
-//        if (_form_shape_current == MP_position.FORMSHAPE_HORIZON1){
-//              _form_shape_current = MP_position.FORMSHAPE_HORIZON1;
-//        }
-
-
-//        if(_form_shape_current == MP_position.FORMSHAPE_VERTIAL1){
-//            _form_shape_current = MP_position.FORMSHAPE_HORIZON1_and_VERTIAL1;
-//        } else
-
-//        }
-
-
-
-//        break;
-//    case MP_position.FORMSHAPE_VERTIAL1 :
-
-
-//        if(_form_shape_current == MP_position.FORMSHAPE_HORIZON1){
-//            _form_shape_current = MP_position.FORMSHAPE_HORIZON1_and_VERTIAL1;
-//        }
-
-
-
-//        break;
-
-
-//    }
-
-
-
-
-
+    static uint8_t _form_shape_current =  MP_position.FORMSHAPE_RHOMBUS4;
     _form_shape_current =  MP_position.formshape_id;
-
-
 
     /*这部分进行编队队形计算,计算出从机在编队中的相对位置*/
     //输入:编队队形编号
@@ -1328,13 +1278,21 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 //   static bool info1 = true;
     static uint8_t _form_shape_last = 0;
 
+    static int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
+                                                      { 0, 0}, // 1号机位置(主机) 坐标原点
+                                                      {-1, 1}, // 2号机位置,主机右边,后面
+                                                      {-1,-1}, // 3号机位置,主机左边,后面
+                                                      {-2, 0}  // 4号机位置,主机后面
+                                               };
+
     float L_space(10.0f);  //编队飞机之间的间距
+
     matrix::Vector2f L_MPtoSP = {L_space,L_space}; //从机相对主机的偏移距离向量,主机地轴航向作为x轴正方向,主机右侧是y正方向
     uint8_t sys_id = _vehicle_status.system_id;
     switch (_form_shape_current) {
     case MP_position.FORMSHAPE_HORIZON1 :
         if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换水平1字编队");
+            mavlink_log_info(&_mavlink_log_pub,"#转换横向1字编队");
         }
 
         L_MPtoSP = {0.0f, L_space * (sys_id-1)};
@@ -1351,25 +1309,28 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         break;
     case MP_position.FORMSHAPE_VERTIAL1  :
         if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换竖直1字编队");
+            mavlink_log_info(&_mavlink_log_pub,"#转换纵向1字编队");
         }
 
         L_MPtoSP = {-1.0f * L_space * (sys_id-1) ,0.0f};
+
+        break;
+    case MP_position.FORMSHAPE_VERTIAL1_and_RHOMBUS4  :
+        if(_form_shape_last != _form_shape_current){
+            mavlink_log_info(&_mavlink_log_pub,"#菱形 纵向 过渡编队");
+        }
+
+        L_MPtoSP(0) = -1.0f * L_space * (sys_id-1);                     //纵向坐标
+        L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;  //横向坐标
+
 
         break;
     case MP_position.FORMSHAPE_RHOMBUS4  :
         if(_form_shape_last != _form_shape_current){
             mavlink_log_info(&_mavlink_log_pub,"#转换菱形4机编队");
         }
-        static int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
-                                                          { 0, 0}, // 1号机位置(主机) 坐标原点
-                                                          {-1, 1}, // 2号机位置,主机右边,后面
-                                                          {-2, 0}, // 3号机位置,主机后面
-                                                          {-1,-1}  // 4号机位置,主机左边,后面
-                                                   };
-
-        L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;
-        L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;
+        L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;//纵向坐标
+        L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;//横向坐标
 
         break;
     }
@@ -1491,7 +1452,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //这里要注意差值向量的正负
 
-    float K_P(2.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的,注意,参数为2时3号机也能飞,不建议再继续增大了,下次调试改成1.5试试
+    float K_P(1.5f); //距离差量的增益值  待办,这个参数要做成地面站可调的,注意,参数为2时3号机也能飞,不建议再继续增大了,下次调试改成1.5试试
     float K_D(1.2f); //速度差量的增益值  待办,这个参数要做成地面站可调的,注意,这个值先保持1.2,目前问题是当通信频率不高时这个值是否有效
     Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
@@ -1555,6 +1516,10 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
         //以下两种模式,等测试
         static int8_t last_check_aux2_SW_enable = 0;
         int8_t now_check_aux2_SW_enable = check_aux2_SW_enable();
+
+        //待办,给飞机增加高度处理程序,现在飞机在天上高度严重不一致.
+        //待办,给飞机增加获得定位时报高度的程序,方便外场操作
+        //待办,当某个飞机超出控制精度,需要降高度避险时,需要地面站发出声音
 
         if(true){
             if(last_check_aux2_SW_enable != now_check_aux2_SW_enable){

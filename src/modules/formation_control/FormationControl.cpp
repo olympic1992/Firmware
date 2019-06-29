@@ -457,8 +457,8 @@ void FormationControl::run()
                 //待办:在这里增加编队队形控制的命令语句
 
                 if(check_aux3_enable_follow()){
-                    P1_send.formshape_id = P1_send_target.FORMSHAPE_HORIZON1;
-                    //                 mavlink_log_info(&_mavlink_log_pub,"#主机水平一字编队");
+                    P1_send.formshape_id = P1_send_target.FORMSHAPE_RHOMBUS4;
+                    //                 mavlink_log_info(&_mavlink_log_pub,"#主机菱形4机编队");
                 }else{
                     P1_send.formshape_id = P1_send_target.FORMSHAPE_VERTIAL1;
                     //                    mavlink_log_info(&_mavlink_log_pub,"#主机竖直1字编队");

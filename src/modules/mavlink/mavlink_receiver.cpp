@@ -2515,8 +2515,81 @@ MavlinkReceiver::handle_message_formationx(mavlink_message_t *msg)
     temp.yaw = formx_rec.yaw_body;
 
 
-    //待办:这里的编队形状是预定义的,需要做成可以根据主机信息变换的
-    temp.formshape_id = formx_rec.formshape_id;
+    //编队形状是根据主机信息变换的
+    //输入,主机指令(或人工控制指令)
+    //根据当前队形编号和目标队形编号,分时间输出不同的编队队形编号,要包括过渡队形编号.
+    //输出,编队队形编号_form_shape_current
+
+    static follow_target_s formx_CMD_rec{};
+    static uint8_t _form_shape_current =  formx_CMD_rec.FORMSHAPE_RHOMBUS4;  //初始化默认编队
+    static uint8_t last_form_shape_current =  0;  //初始化默认编队
+
+    static uint64_t times_H_V = hrt_absolute_time(); //初始化当前时间,从现在开始计时
+
+    switch(formx_rec.formshape_id){ //筛选主机命令
+    case formx_CMD_rec.FORMSHAPE_HORIZON1 ://主机命令是横向1字
+
+        if (_form_shape_current == formx_CMD_rec.FORMSHAPE_HORIZON1){
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_HORIZON1;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_VERTIAL1){
+            times_H_V = hrt_absolute_time(); //初始化当前时间,从现在开始计时
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_HORIZON1_and_VERTIAL1;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_HORIZON1_and_VERTIAL1){
+
+            if((hrt_elapsed_time(&times_H_V) * 1e-6f) > 3.0f){ //等待3秒
+                _form_shape_current = formx_CMD_rec.FORMSHAPE_HORIZON1;
+            }
+        } else {
+            mavlink_log_critical(_mavlink->get_mavlink_log_pub(), "#暂无这个功能,当前队形%d,目标队形%d",_form_shape_current,formx_rec.formshape_id);
+        }
+
+        break;
+    case formx_CMD_rec.FORMSHAPE_VERTIAL1 : //主机命令是纵向1字
+
+        if (_form_shape_current == formx_CMD_rec.FORMSHAPE_VERTIAL1){
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_VERTIAL1;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_HORIZON1){ //当前是横向1字
+            times_H_V = hrt_absolute_time(); //初始化当前时间,从现在开始计时
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_HORIZON1_and_VERTIAL1;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_RHOMBUS4){ //当前是菱形4机
+            times_H_V = hrt_absolute_time(); //初始化当前时间,从现在开始计时
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_VERTIAL1_and_RHOMBUS4;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_HORIZON1_and_VERTIAL1
+                  || _form_shape_current == formx_CMD_rec.FORMSHAPE_VERTIAL1_and_RHOMBUS4){
+
+            if((hrt_elapsed_time(&times_H_V) * 1e-6f) > 3.0f){ //等待3秒
+                _form_shape_current = formx_CMD_rec.FORMSHAPE_VERTIAL1;
+            }
+        }else {
+            mavlink_log_critical(_mavlink->get_mavlink_log_pub(), "#暂无这个功能,当前队形%d,目标队形%d",_form_shape_current,formx_rec.formshape_id);
+        }
+
+        break;
+    case formx_CMD_rec.FORMSHAPE_RHOMBUS4 : //主机命令是菱形4机
+
+        if (_form_shape_current == formx_CMD_rec.FORMSHAPE_RHOMBUS4){
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_RHOMBUS4;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_VERTIAL1){ //当前是纵向1字
+            times_H_V = hrt_absolute_time(); //初始化当前时间,从现在开始计时
+            _form_shape_current = formx_CMD_rec.FORMSHAPE_VERTIAL1_and_RHOMBUS4;
+        } else if(_form_shape_current == formx_CMD_rec.FORMSHAPE_VERTIAL1_and_RHOMBUS4){
+
+            if((hrt_elapsed_time(&times_H_V) * 1e-6f) > 3.0f){ //等待3秒
+                _form_shape_current = formx_CMD_rec.FORMSHAPE_RHOMBUS4;
+            }
+        }else {
+            mavlink_log_critical(_mavlink->get_mavlink_log_pub(), "#暂无这个功能,当前队形%d,目标队形%d",_form_shape_current,formx_rec.formshape_id);
+        }
+
+        break;
+    }
+    if(last_form_shape_current != _form_shape_current){
+        mavlink_log_info(_mavlink->get_mavlink_log_pub(), "#当前队形%d,目标队形%d",_form_shape_current,formx_rec.formshape_id);
+    }
+    last_form_shape_current = _form_shape_current;
+
+    temp.formshape_id = _form_shape_current;
+
 
 
 
