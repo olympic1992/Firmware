@@ -67,6 +67,9 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.pitchsp_offset_deg = param_find("FW_PSP_OFF");
 
     _parameter_handles.land_slope_angle = param_find("FW_LND_ANG");
+    _parameter_handles.form_kp = param_find("FORM_KP");
+    _parameter_handles.form_kd = param_find("FORM_KD");
+    _parameter_handles.form_temp = param_find("FORMA_PARAM3");
     _parameter_handles.land_H1_virt = param_find("FW_LND_HVIRT");
     _parameter_handles.land_flare_alt_relative = param_find("FW_LND_FLALT");
     _parameter_handles.land_flare_pitch_min_deg = param_find("FW_LND_FL_PMIN");
@@ -253,6 +256,15 @@ FixedwingPositionControl::parameters_update()
     float land_slope_angle = 0.0f;
     param_get(_parameter_handles.land_slope_angle, &land_slope_angle);
 
+    param_get(_parameter_handles.form_kp, &_kp);
+    //warnx("---angle1=%2.1f",(double)land_slope_angle1);
+
+    param_get(_parameter_handles.form_kd, &_kd);
+   // warnx("----angle2=%2.1f",(double)land_slope_angle2);
+
+    param_get(_parameter_handles.form_temp, &_temp);
+   // warnx("---angle3=%2.1f",(double)land_slope_angle3);
+
     float land_flare_alt_relative = 0.0f;
     param_get(_parameter_handles.land_flare_alt_relative, &land_flare_alt_relative);
 
@@ -268,6 +280,9 @@ FixedwingPositionControl::parameters_update()
     }
 
     _landingslope.update(radians(land_slope_angle), land_flare_alt_relative, land_thrust_lim_alt_relative, land_H1_virt);
+
+    // mavlink_log_info(&_mavlink_log_pub,"0=%2.1f  1=%2.1f 1=%2.1f 1=%2.1f  ",(double)land_slope_angle,(double)land_slope_angle1,(double)land_slope_angle2,(double)land_slope_angle3);
+
 
 
     // Update and publish the navigation capabilities
@@ -1336,6 +1351,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     }
     _form_shape_last = _form_shape_current; //记录上面状态机的值
 
+    //把两架飞机之间的水平距离转换为地理坐标系下的差距，下一步好根据这个差距计算从机的位置指令
     matrix::Vector2f L_MPtoSP_ned = bodytoNED(L_MPtoSP,MP_gndspd_ned,MP_position_filter.yaw);
 
     float L_spacePB{30.0f};//2.0f * _navigator->get_acceptance_radius());  // B点到从机目标位置的距离,默认大于L1距离
@@ -1387,6 +1403,14 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     static follow_target_s SP_position_sp;
     static follow_target_s PB_position_sp;
     static follow_target_s PA_position_sp;
+
+    //下面这段代码主要是NED坐标系和全球坐标系之间的转换，map_projection_init函数的意思就是当前这个经度纬度视为（0,0）原点。
+    //map_projection_reproject函数在原点基础上 偏移一个（x,y）后的经度纬度是多少，这样就可以根据两个点之间地理坐标系的差距 计算出另外一个点的全球坐标系
+    //当然与之对应的 还有一个是已知B点的全球坐标系 可以映射求出B点的地理坐标系
+    //
+    //编队目的，下面已知主机和从机的地理坐标系上编队的差距，知道主机的位置 如何求从机的位置经度纬度？
+    //那就把主机位置映射成原点，加上地理坐标系上的偏移后，求出从机的经度纬度。函数重要重要是地理坐标系和全球坐标系之间的转换，主要注意的是初始化谁是原点（0,0）
+
     //初始化主机位置
     map_projection_init(&target_ref,  MP_position_filter.lat, MP_position_filter.lon);
     //计算主机时移位置
@@ -1452,13 +1476,13 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     //这里要注意差值向量的正负
 
-    float K_P(1.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的,注意,参数为2时3号机也能飞,不建议再继续增大了,下次调试改成1.5试试
-    float K_D(1.0f); //速度差量的增益值  待办,这个参数要做成地面站可调的,注意,这个值先保持1.2,目前问题是当通信频率不高时这个值是否有效
+    // float K_P(1.0f); //距离差量的增益值  待办,这个参数要做成地面站可调的,注意,参数为2时3号机也能飞,不建议再继续增大了,下次调试改成1.5试试
+    // float K_D(1.0f); //速度差量的增益值  待办,这个参数要做成地面站可调的,注意,这个值先保持1.2,目前问题是当通信频率不高时这个值是否有效
 //    Vector2f SP_gndspd_ned_sp = MP_gndspd_ned + MP_gndspd_ned.normalized() * (K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project); //从机目标地速向量于主机地速向量平行
 
     //新增新的速度控制方法,将速度差量直接加在测量的空速上.
 
-    float airspeed_follow_sp = air_speed_2d.length() + K_P * dL_PtoPsp_project + K_D * dV_MPtoSP_project;
+    float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_PtoPsp_project + _kd * dV_MPtoSP_project;
 
 
 
@@ -2281,6 +2305,8 @@ FixedwingPositionControl::run()
             //            if(INFO_enable_1s) PX4_INFO("_pos_sp_triplet.current.vx = %.1f",double(_pos_sp_triplet.current.vx));
 
 
+            //mavlink_log_info(&_mavlink_log_pub,"kp=%2.1f  kd=%2.1f ",(double)_kp,(double)_kd);
+            
             if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
                 _att_sp.timestamp = hrt_absolute_time();
 
