@@ -24,4 +24,9 @@ bool apply_flaps
 
 float32 landing_gear
 
+float32 air_follow_sp
+float32 air_speed_2d
+float32 air_PtoPsp
+float32 air_MPtoSP
+
 # TOPICS vehicle_attitude_setpoint mc_virtual_attitude_setpoint fw_virtual_attitude_setpoint
