@@ -1312,25 +1312,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     Vector2f MP_speed = MP_gndspd_ned;
 
 
-//    static follow_target_s MP_position_prev{};
-//    float dt_ms = (MP_position_filter.timestamp - MP_position_prev.timestamp) *1e-3f;
-//    if (dt_ms >= 100.0f) {
-//        // get last gps known reference for target
-//        static matrix::Vector3f MP_position_delta3D{};
-//        get_vector_to_next_waypoint( MP_position_prev.lat,MP_position_prev.lon,MP_position_filter.lat,MP_position_filter.lon,
-//                                     &MP_position_delta3D(0),&MP_position_delta3D(1));
-//        MP_position_delta3D(2) = MP_position_filter.alt - MP_position_prev.alt;
-//        // update the average velocity of the target based on the position
-//        matrix::Vector3f MP_velocity_average3D = MP_position_delta3D / (dt_ms * 1e-3f);
-//        MP_position_filter.vx = MP_velocity_average3D(0);
-//        MP_position_filter.vy = MP_velocity_average3D(1);
-//        MP_position_filter.vz = MP_velocity_average3D(2);
-//        MP_position_prev = MP_position_filter;  //每一段计算时间之后,重新复位MP_position_prev
-//    }
-
-//    Vector2f MP_speed = {MP_position_filter.vx,MP_position_filter.vy};    //收到的主机的速度.单位 m/s
-//    Vector2f MP_gndspd_ned = {MP_position_filter.vx,MP_position_filter.vy};    //收到的主机的速度.单位 m/s
-
 
     static uint8_t _form_shape_current =  MP_position.FORMSHAPE_RHOMBUS4;
     _form_shape_current =  MP_position.formshape_id;
@@ -1496,6 +1477,9 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
 
+
+
+
     /******************************************* 这部分进行纵向控制 **************************************************************************/
 
     //计算位置差
@@ -1534,8 +1518,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     _att_sp.air_follow_sp = airspeed_follow_sp;
     _att_sp.air_speed_2d  = air_speed_2d.length();
-    _att_sp.air_PtoPsp    = dL_project;
-    _att_sp.air_MPtoSP    = dV_project;
+    _att_sp.air_dL_project    = dL_project;
+    _att_sp.air_dV_project    = dV_project;
 
 
     float throttle_follow_refer = mission_throttle;
