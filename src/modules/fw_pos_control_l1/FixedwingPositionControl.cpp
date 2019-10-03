@@ -1484,6 +1484,10 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_PtoPsp_project + _kd * dV_MPtoSP_project;
 
+    _att_sp.air_follow_sp = airspeed_follow_sp;
+    _att_sp.air_speed_2d  = air_speed_2d.length();
+    _att_sp.air_PtoPsp    = dL_PtoPsp_project;
+    _att_sp.air_MPtoSP    = dV_MPtoSP_project;
 
 
 
