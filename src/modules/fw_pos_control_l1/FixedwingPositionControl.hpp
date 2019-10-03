@@ -253,10 +253,6 @@ Vector2f Psp2A_offset_ned{};
 	float _flare_curve_alt_rel_last{0.0f};
 	float _target_bearing{0.0f};				///< estimated height to ground at which flare started */
 
-	float _kp{1.0f};
-	float _kd{1.0f};
-	float _temp{0.0f};
-
 	bool _was_in_air{false};				///< indicated wether the plane was in the air in the previous interation*/
 	hrt_abstime _time_went_in_air{0};			///< time at which the plane went in the air */
 
@@ -295,6 +291,14 @@ Vector2f Psp2A_offset_ned{};
 
 	ECL_L1_Pos_Controller	_l1_control;
 	TECS			_tecs;
+
+
+    float _kp{1.0f};
+    float _kd{1.0f};
+    float _temp{1.0f};
+
+
+
 
 	enum FW_POSCTRL_MODE {
 		FW_POSCTRL_MODE_AUTO,
@@ -390,9 +394,16 @@ Vector2f Psp2A_offset_ned{};
 		param_t throttle_land_max;
 
 		param_t land_slope_angle;
-		param_t form_kp;
-		param_t form_kd;
-		param_t form_temp;
+
+        param_t form_kp;
+        param_t form_kd;
+        param_t form_temp;
+
+
+
+
+
+
 		param_t land_H1_virt;
 		param_t land_flare_alt_relative;
 		param_t land_thrust_lim_alt_relative;
@@ -478,6 +489,15 @@ Vector2f Psp2A_offset_ned{};
 
     matrix::Vector2f bodytoNED(matrix::Vector2f L_body,matrix::Vector2f speed_ned, float yaw);
 
+
+void cal_mean_spd(const follow_target_s &P_position_sp,follow_target_s &P_position_prev,Vector2f &P_gndspd_ned);
+void cal_relative_lapse_position(
+        const follow_target_s &MP_position_filter,
+        const Vector2f &L_MPtoSP_ned,
+        follow_target_s &new_SP_position_sp_prev,
+        const float &dt_utc_s,
+        follow_target_s &new_SP_position_sp_dL,
+        Vector2f &P_relative_speed);
 
    void INFO_enable_1s_TS();
      void INFO_enable1s_TS();
