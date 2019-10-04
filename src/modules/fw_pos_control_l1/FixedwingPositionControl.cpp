@@ -708,7 +708,7 @@ bool
 FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vector2f &ground_speed,
                                            const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
-    mavlink_log_info(&_mavlink_log_pub,"位置 标记 2 ");
+//    mavlink_log_info(&_mavlink_log_pub,"位置 标记 2 ");
 //    if(INFO_enable_1s) PX4_INFO("control_position 程序正在运行 %.1f秒",double(hrt_absolute_time()/1000/1000));
     float dt = 0.01f;
 
@@ -771,8 +771,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* reset integrators */
         _tecs.reset_state();
     }
-//    if (_control_mode.flag_control_auto_enabled && pos_sp_curr.valid) {
-    if(true){mavlink_log_info(&_mavlink_log_pub,"位置 标记 34 ");
+    if (_control_mode.flag_control_auto_enabled && pos_sp_curr.valid) {
+//    if(true){mavlink_log_info(&_mavlink_log_pub,"位置 标记 34 ");
         /* AUTONOMOUS FLIGHT */
 
         _control_mode_current = FW_POSCTRL_MODE_AUTO;
@@ -897,7 +897,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET) {  //这里是自定义的语句,增加的follow_target模式
 
-            mavlink_log_info(&_mavlink_log_pub,"位置 标记 3");
+//            mavlink_log_info(&_mavlink_log_pub,"位置 标记 3");
             control_follow_target(nav_speed_2d,
                                   air_speed_2d,mission_throttle,
                                   pos_sp_prev,pos_sp_curr);
@@ -1268,7 +1268,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                                                 const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
 
-    mavlink_log_info(&_mavlink_log_pub,"位置 标记 4");
+//    mavlink_log_info(&_mavlink_log_pub,"位置 标记 4");
     //控制输出频率
     static uint64_t prevsend2time = 0;
     float dt_send2time = hrt_elapsed_time(&prevsend2time) * 1e-6f;
@@ -1315,21 +1315,21 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     MP_position_filter.alt = MP_position_filter.alt *         _responsiveness + MP_position.alt *         (1 - _responsiveness); //附加一个对高度的滤波
     MP_position_filter.yaw = MP_position_filter.yaw *         _responsiveness + MP_position.yaw *         (1 - _responsiveness); //附加一个对高度的滤波
 
-    MP_position_filter.timestamp = hrt_absolute_time();//调试
-    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
+//    MP_position_filter.timestamp = hrt_absolute_time();//调试
+//    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
 
     //这一段用来求平均速度
     Vector2f MP_gndspd_ned;
     static follow_target_s MP_position_filter_prev{};
     cal_mean_spd(MP_position_filter,MP_position_filter_prev,MP_gndspd_ned);
-    mavlink_log_info(&_mavlink_log_pub, "%d号 M位置: %.0f",_vehicle_status.system_id,double(MP_position_filter.lat * 1e7));
+//    mavlink_log_info(&_mavlink_log_pub, "%d号 M位置: %.0f",_vehicle_status.system_id,double(MP_position_filter.lat * 1e7));
 
 
 
     static uint8_t _form_shape_current =  MP_position.FORMSHAPE_RHOMBUS4;
     _form_shape_current =  MP_position.formshape_id;
 
-    _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1; //调试
+//    _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1; //调试
 
     /*这部分进行编队队形计算,计算出从机在编队中的相对位置*/
     //输入:编队队形编号
@@ -1504,7 +1504,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
 hrt_abstime now_time2 = hrt_absolute_time();
 hrt_abstime D_now_times = now_time2 - now_time1;
-mavlink_log_info(&_mavlink_log_pub, "%d号 D_now_times: %.0f",_vehicle_status.system_id,double(D_now_times));
+D_now_times =D_now_times ;//调试使用
+//mavlink_log_info(&_mavlink_log_pub, "%d号 D_now_times: %.0f",_vehicle_status.system_id,double(D_now_times));
 
 
     /******************************************* 这部分进行纵向控制 **************************************************************************/
@@ -2219,10 +2220,10 @@ FixedwingPositionControl::run()
 
 
 
-//    while (!should_exit()) {
-    while(true){     sleep(1); mavlink_log_info(&_mavlink_log_pub,"位置控制运行1HZ 1 ");
+    while (!should_exit()) {
+//    while(true){     sleep(1); mavlink_log_info(&_mavlink_log_pub,"位置控制运行1HZ 1 "); //调试
 
-        if(0){
+//        if(0){ //调试
         /* wait for up to 500ms for data */
         int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
@@ -2236,7 +2237,7 @@ FixedwingPositionControl::run()
             PX4_WARN("poll error %d, %d", pret, errno);
             continue;
         }
-        }
+ //       } //调试
 
         /* only update parameters if they changed */
         bool params_updated = false;
@@ -2252,8 +2253,8 @@ FixedwingPositionControl::run()
         }
 
         /* only run controller if position changed */
-//        if ((fds[0].revents & POLLIN) != 0) {
-            if(true){
+        if ((fds[0].revents & POLLIN) != 0) {
+ //           if(true){  //调试
 
             perf_begin(_loop_perf);
 
@@ -2306,8 +2307,8 @@ FixedwingPositionControl::run()
 
 
             //mavlink_log_info(&_mavlink_log_pub,"kp=%2.1f  kd=%2.1f ",(double)_kp,(double)_kd);
-             mavlink_log_info(&_mavlink_log_pub,"位置 标记1 ");
-_pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;//调试
+//            mavlink_log_info(&_mavlink_log_pub,"位置 标记1 ");  //调试
+//       _pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;//调试
 
             if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
                 _att_sp.timestamp = hrt_absolute_time();
