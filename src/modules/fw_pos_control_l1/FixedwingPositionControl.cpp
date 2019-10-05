@@ -1211,10 +1211,14 @@ matrix::Vector2f FixedwingPositionControl::bodytoNED(matrix::Vector2f L_body,mat
 
 void FixedwingPositionControl::cal_mean_spd(const follow_target_s &Position_sp,follow_target_s &Position_sp_prev,Vector2f &P_gndspd_ned)
 {
+
     float dt_ms = (Position_sp.timestamp - Position_sp_prev.timestamp) *1e-3f;
     if (dt_ms >= 2000.0f) {
         Position_sp_prev = Position_sp;  //当第一次计算时,复位Position_sp_prev
-    }else if (dt_ms >= 100.0f) {
+    }else if (dt_ms >= 200.0f) {
+        //调试打印
+        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%2MP dt %.0f",_vehicle_status.system_id,double(dt_ms));
+
         // get last gps known reference for target
         static matrix::Vector3f P_position_delta3D{};
         get_vector_to_next_waypoint( Position_sp_prev.lat,Position_sp_prev.lon,Position_sp.lat,Position_sp.lon,
@@ -1228,17 +1232,17 @@ void FixedwingPositionControl::cal_mean_spd(const follow_target_s &Position_sp,f
 }
 
 void FixedwingPositionControl::cal_relative_position(
-        const follow_target_s &position1_initial,
+        const follow_target_s &P_initial,
         const Vector2f &L_P1toP2_ned,
         follow_target_s &P_relative)
 {
     //初始化主机位置
     map_projection_reference_s target_ref;
-    map_projection_init(&target_ref,  position1_initial.lat, position1_initial.lon);
+    map_projection_init(&target_ref,  P_initial.lat, P_initial.lon);
     //计算相对点的GPS坐标
     map_projection_reproject(&target_ref, L_P1toP2_ned(0), L_P1toP2_ned(1),
                              &P_relative.lat, &P_relative.lon);
-    P_relative.timestamp = position1_initial.timestamp;
+    P_relative.timestamp = P_initial.timestamp;
 }
 
 void FixedwingPositionControl::cal_relat_lapse_position(
@@ -1297,7 +1301,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                                                 const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
 
-//    mavlink_log_info(&_mavlink_log_pub,"位置 标记 4");
+    //    mavlink_log_info(&_mavlink_log_pub,"位置 标记 4");
     //控制输出频率
     static uint64_t prevsend2time = 0;
     float dt_send2time = hrt_elapsed_time(&prevsend2time) * 1e-6f;
@@ -1307,17 +1311,12 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     if((hrt_elapsed_time(&previnfo2time) * 1e-6f) > 1.0f){
         previnfo2time = prevsend2time;
         PX4_INFO("\n\n control_follow_target周期:%6.3fs 频率:%3.1fHz",double(dt_send2time),double(send2HZ));
-//        mavlink_log_info(&_mavlink_log_pub,"#跟随位置控制");
+        //        mavlink_log_info(&_mavlink_log_pub,"#跟随位置控制");
         INFO_enable_1s = true;
     }
 
 
-
-//INFO_enable_1s_TS();
-//INFO_enable1s_TS();
-
-
-//    if(INFO_enable_1s) PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
+    //    if(INFO_enable_1s) PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
 
 
     //获得主机位置信息
@@ -1333,391 +1332,415 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     //对主机位置进行滤波
-    float _responsiveness = 0.01f * _K_MP_smooth;
     static follow_target_s MP_position_filter{};
-    if(MP_position_filter.timestamp == 0){
-        MP_position_filter = MP_position;
-    }
-    MP_position_filter.timestamp = MP_position.timestamp;
-    MP_position_filter.lat = MP_position_filter.lat * (double)_responsiveness + MP_position.lat * (double)(1 - _responsiveness);
-    MP_position_filter.lon = MP_position_filter.lon * (double)_responsiveness + MP_position.lon * (double)(1 - _responsiveness);
-    MP_position_filter.alt = MP_position_filter.alt *         _responsiveness + MP_position.alt *         (1 - _responsiveness); //附加一个对高度的滤波
-    MP_position_filter.yaw = MP_position_filter.yaw *         _responsiveness + MP_position.yaw *         (1 - _responsiveness); //附加一个对高度的滤波
 
-//    MP_position_filter.timestamp = hrt_absolute_time();//调试
-//    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
-//     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_K_MP_smooth));
+    //用来消除在相邻循环运行时重复使用相同的MP_position
+    if(MP_position.timestamp != MP_position_filter.timestamp){        //当新的MP_position与上一个MP_position_filter不同时,才执行下面程序
 
-
-    //这一段用来求平均速度
-    Vector2f MP_gndspd_ned;
-    static follow_target_s MP_position_filter_prev{};
-    cal_mean_spd(MP_position_filter,MP_position_filter_prev,MP_gndspd_ned);
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 M位置: %.0f",_vehicle_status.system_id,double(MP_position_filter.lat * 1e7));
+        float _responsiveness = 0.01f * _K_MP_smooth;//设置平滑系数
+        if(MP_position_filter.timestamp == 0){
+            MP_position_filter = MP_position;
+        }
+        MP_position_filter.timestamp = MP_position.timestamp;
+        MP_position_filter.lat = MP_position_filter.lat * (double)_responsiveness + MP_position.lat * (double)(1 - _responsiveness);
+        MP_position_filter.lon = MP_position_filter.lon * (double)_responsiveness + MP_position.lon * (double)(1 - _responsiveness);
+        MP_position_filter.alt = MP_position_filter.alt *         _responsiveness + MP_position.alt *         (1 - _responsiveness); //附加一个对高度的滤波
+        MP_position_filter.yaw = MP_position_filter.yaw *         _responsiveness + MP_position.yaw *         (1 - _responsiveness); //附加一个对高度的滤波
 
 
+        //    MP_position_filter.timestamp = hrt_absolute_time();//调试
+        //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
+        //     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_K_MP_smooth));
 
-    static uint8_t _form_shape_current =  MP_position.FORMSHAPE_RHOMBUS4;
-    _form_shape_current =  MP_position.formshape_id;
 
-//    _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1; //调试
+        //求主机平均速度
+        Vector2f MP_gndspd_ned;
+        static follow_target_s MP_position_filter_prev{};
+        cal_mean_spd(MP_position_filter,MP_position_filter_prev,MP_gndspd_ned);
 
-    /*这部分进行编队队形计算,计算出从机在编队中的相对位置*/
-    //输入:编队队形编号
-    //输出:从机在某一时刻相对于主机的距离向量 L_MPtoSP{L_along,L_cross}
 
-//   static bool info1 = true;
-    static uint8_t _form_shape_last = 0;
 
-    static int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
-                                                      { 0, 0}, // 1号机位置(主机) 坐标原点
-                                                      {-1, 1}, // 2号机位置,主机右边,后面
-                                                      {-1,-1}, // 3号机位置,主机左边,后面
-                                                      {-2, 0}  // 4号机位置,主机后面
-                                               };
 
-    float L_space = _L_space;  //编队飞机之间的间距
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 M位置: %.0f",_vehicle_status.system_id,double(MP_position_filter.lat * 1e7));
 
-    matrix::Vector2f L_MPtoSP = {L_space,L_space}; //从机相对主机的偏移距离向量,主机地轴航向作为x轴正方向,主机右侧是y正方向
-    uint8_t sys_id = _vehicle_status.system_id;
-    switch (_form_shape_current) {
-    case MP_position.FORMSHAPE_HORIZON1 :
-        if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换横向1字编队");
+
+
+        /*根据队形编号计算从机在编队中的相对位置*/
+        //获取主机发来的队形编号
+        static uint8_t _form_shape_current =  MP_position.FORMSHAPE_HORIZON1;
+        _form_shape_current =  MP_position.formshape_id;
+
+        //    _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1; //调试
+
+        static uint8_t _form_shape_last = 0;
+
+        static int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
+                                                          { 0, 0}, // 1号机位置(主机) 坐标原点
+                                                          {-1, 1}, // 2号机位置,主机右边,后面
+                                                          {-1,-1}, // 3号机位置,主机左边,后面
+                                                          {-2, 0}  // 4号机位置,主机后面
+                                                   };
+
+        float L_space = _L_space;  //编队飞机之间的间距
+
+        matrix::Vector2f L_MPtoSP = {L_space,L_space}; //从机相对主机的偏移距离向量,主机地轴航向作为x轴正方向,主机右侧是y正方向
+        uint8_t sys_id = _vehicle_status.system_id;
+        switch (_form_shape_current) {
+        case MP_position.FORMSHAPE_HORIZON1 :
+            if(_form_shape_last != _form_shape_current){
+                mavlink_log_info(&_mavlink_log_pub,"#转换横向1字编队");
+            }
+
+            L_MPtoSP = {0.0f, L_space * (sys_id-1)};
+
+
+            break;
+
+        case MP_position.FORMSHAPE_HORIZON1_and_VERTIAL1 :
+            if(_form_shape_last != _form_shape_current){
+                mavlink_log_info(&_mavlink_log_pub,"#转换倾斜1字编队");
+            }
+            L_MPtoSP = {-1.0f * L_space * (sys_id-1), L_space * (sys_id-1)};
+
+            break;
+        case MP_position.FORMSHAPE_VERTIAL1  :
+            if(_form_shape_last != _form_shape_current){
+                mavlink_log_info(&_mavlink_log_pub,"#转换纵向1字编队");
+            }
+
+            L_MPtoSP = {-1.0f * L_space * (sys_id-1) ,0.0f};
+
+            break;
+        case MP_position.FORMSHAPE_VERTIAL1_and_RHOMBUS4  :
+            if(_form_shape_last != _form_shape_current){
+                mavlink_log_info(&_mavlink_log_pub,"#菱形 纵向 过渡编队");
+            }
+
+            L_MPtoSP(0) = -1.0f * L_space * (sys_id-1);                     //纵向坐标
+            L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;  //横向坐标
+
+
+            break;
+        case MP_position.FORMSHAPE_RHOMBUS4  :
+            if(_form_shape_last != _form_shape_current){
+                mavlink_log_info(&_mavlink_log_pub,"#转换菱形4机编队");
+            }
+            L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;//纵向坐标
+            L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;//横向坐标
+
+            break;
+        }
+        _form_shape_last = _form_shape_current; //记录上面状态机的值
+
+        //把两架飞机之间的水平距离转换为地理坐标系下的差距，下一步好根据这个差距计算从机的位置指令
+        matrix::Vector2f L_MPtoSP_ned = bodytoNED(L_MPtoSP,MP_gndspd_ned,MP_position_filter.yaw);
+
+        float L_spacePB{80.0f};//2.0f * _navigator->get_acceptance_radius());  // B点到从机目标位置的距离,默认大于L1距离
+        float L_spacePA{0.0f};  //A点到从机目标位置的距离,这个距离不宜太大
+        matrix::Vector2f offset_PB_ned = bodytoNED({L_spacePB         , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PB方向为正
+        matrix::Vector2f offset_PA_ned = bodytoNED({-1.0f * L_spacePA , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PA方向为负
+
+        //获得从机GPS位置信息
+        bool vehicle_gps_position_updated;
+        static vehicle_gps_position_s SP_gps_pos;
+        orb_check(_vehicle_gps_position_sub, &vehicle_gps_position_updated);
+        if (vehicle_gps_position_updated) {
+            orb_copy(ORB_ID(vehicle_gps_position), _vehicle_gps_position_sub, &SP_gps_pos);
+        }
+        //获得从机global位置信息
+        bool vehicle_global_position_updated;
+        static int _vehicle_global_position_sub = orb_subscribe(ORB_ID(vehicle_global_position));
+        static vehicle_global_position_s SP_global_pos{};
+        orb_check(_vehicle_global_position_sub, &vehicle_global_position_updated);
+        if (vehicle_global_position_updated) {
+            orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &SP_global_pos);
+        }
+        Vector2f curr_pos = {float(SP_global_pos.lat),float(SP_global_pos.lon)};  //初始化从机位置向量
+
+
+        hrt_abstime now_utc_time0 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
+        float dt_utc_s0 = (now_utc_time0-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+        float dt_utc_s = dt_utc_s0;
+
+        //调试打印
+        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%2MP dt_utc_s %.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
+
+
+        static int times_mavlink = 9;
+        if(dt_utc_s>0.25f){//说明此时主机数据传输有较大延时,此数据不能作为预测使用
+            if(times_mavlink % 10 == 0){
+                if(INFO_enable_1s) mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号超时%.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
+                //           if(INFO_enable1s) PX4_INFO("超时dt_utc_s: %.2f pos_sp_curr.timestamp=%.0f",double(dt_utc_s),double(pos_sp_curr.timestamp))  ;
+            }
+            times_mavlink ++;
+            dt_utc_s = 0.1f;//避免延时问题,更改为平均值
+        } else {
+            times_mavlink = 9;
+        }
+        //这一段计算在时间差内的位移,并且应用到主机位置上
+
+        //    Vector2f MP_deltaL = dt_utc_s * MP_speed;  //主机在传输时间差内的位移 单位m
+
+
+        hrt_abstime now_utc_time1 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
+        hrt_abstime now_time1 = hrt_absolute_time();
+
+
+        /***********************下面是新方法计算从机目标点\A\B点的速度***********************/
+
+        //下面这段代码主要是NED坐标系和全球坐标系之间的转换，map_projection_init函数的意思就是当前这个经度纬度视为（0,0）原点。
+        //map_projection_reproject函数在原点基础上 偏移一个（x,y）后的经度纬度是多少，这样就可以根据两个点之间地理坐标系的差距 计算出另外一个点的全球坐标系
+        //当然与之对应的 还有一个是已知B点的全球坐标系 可以映射求出B点的地理坐标系
+        //
+        //编队目的，下面已知主机和从机的地理坐标系上编队的差距，知道主机的位置 如何求从机的位置经度纬度？
+        //那就把主机位置映射成原点，加上地理坐标系上的偏移后，求出从机的经度纬度。函数重要重要是地理坐标系和全球坐标系之间的转换，主要注意的是初始化谁是原点（0,0）
+
+        //    dt_utc_s = 0.0f; //调试
+
+        Vector2f L_MPtoPA_ned = L_MPtoSP_ned + offset_PA_ned;
+        Vector2f L_MPtoPB_ned = L_MPtoSP_ned + offset_PB_ned;
+
+        //计算SP点
+        static follow_target_s SP_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
+        follow_target_s SP_position_sp{};
+        Vector2f SP_speed_sp;
+        cal_relat_lapse_position(
+                    MP_position_filter,
+                    L_MPtoSP_ned,
+                    SP_position_sp,
+                    dt_utc_s,
+                    SP_speed_sp,
+                    SP_position_sp_prev);
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 SP位置: %.0f",_vehicle_status.system_id,double(SP_position_sp.lat *1e7));
+
+        //计算PA点
+        static follow_target_s PA_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
+        follow_target_s PA_position_sp{};
+        Vector2f PA_speed_sp;
+        cal_relat_lapse_position(
+                    MP_position_filter,
+                    L_MPtoPA_ned,
+                    PA_position_sp,
+                    dt_utc_s,
+                    PA_speed_sp,
+                    PA_position_sp_prev);
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 PA位置: %.0f",_vehicle_status.system_id,double(PA_position_sp.lat *1e7));
+
+        //计算PB点
+        static follow_target_s PB_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
+        follow_target_s PB_position_sp{};
+        Vector2f PB_speed_sp;
+        cal_relat_lapse_position(
+                    MP_position_filter,
+                    L_MPtoPB_ned,
+                    PB_position_sp,
+                    dt_utc_s,
+                    PB_speed_sp,
+                    PB_position_sp_prev);
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 PB位置: %.0f",_vehicle_status.system_id,double(PB_position_sp.lat *1e7));
+
+
+
+
+        /***********************上面是新方法计算从机目标点\A\B点的速度***********************/
+
+        hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
+        hrt_abstime now_time2 = hrt_absolute_time();
+        hrt_abstime D_now_times = now_time2 - now_time1;
+        D_now_times =D_now_times ;//调试使用
+        //mavlink_log_info(&_mavlink_log_pub, "%d号 D_now_times: %.0f",_vehicle_status.system_id,double(D_now_times));
+
+
+        /******************************************* 这部分进行纵向控制 **************************************************************************/
+
+        //计算位置差
+        static Vector2f PtoPsp_distance{}; //从机实际位置P到从机目标位置Psp之间的距离向量
+        get_vector_to_next_waypoint(SP_global_pos.lat,SP_global_pos.lon,SP_position_sp.lat,SP_position_sp.lon,
+                                    &PtoPsp_distance(0),&PtoPsp_distance(1));
+        //计算速度差
+        Vector2f SP_speed = {SP_global_pos.vel_n,SP_global_pos.vel_e};
+        Vector2f SP_speed__delta = SP_speed_sp - SP_speed;  //从机目标地速减去从机实际地速
+
+
+        //调试打印
+        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "%d号速度 MP=%3.0f SPsp=%3.0f SPnow=%3.0f PA=%3.0f PB=%3.0f ",_vehicle_status.system_id,
+                                            double(MP_gndspd_ned.length()),double(SP_speed_sp.length()),double(SP_speed.length()),double(PA_speed_sp.length()),double(PB_speed_sp.length()));
+
+
+
+
+        //从机实际航向 与 从机目标航向的角度差
+        float bear_P2Psp_P1v = math::degrees(atan2f(PtoPsp_distance % SP_speed_sp,PtoPsp_distance * SP_speed_sp));
+
+        //计算从机的航线方向角,就是从A点指向B点的方向
+        //    //先获得主机的实际航向角
+        //    Vector2f yaw_norm = {float(cos(double(MP_position_filter.yaw))),float(sin(double(MP_position_filter.yaw)))};
+
+
+        //计算A点到B点的向量
+        static Vector2f AtoB_vector{};
+        get_vector_to_next_waypoint(PA_position_sp.lat,PA_position_sp.lon,PB_position_sp.lat,PB_position_sp.lon,
+                                    &AtoB_vector(0),&AtoB_vector(1));
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 AtoB_vector(0): %.0f米",_vehicle_status.system_id,double(AtoB_vector(0)));
+
+
+        //待办:在飞行或高速运动的时候务必确认以下以上两个向量的角度,先飞主机看看
+        //待办:在地面上调好飞机的距离响应和反馈,务必确认好速度的反馈
+
+        //待办:这部分速度投影的处理还需要再优化,后期可以根据从机到编队的距离来判断,当距离非常大时不使用投影,距离很小时使用投影.或者根据从机到主机的方位来判断.
+        //计算在从机目标速度上的投影
+        float dL_project(math::constrain(PtoPsp_distance * AtoB_vector.normalized(),-20.0f, 20.0f)); //注意将距离差向量投影到主机速度向量上 ,加限幅是为了防止SP_speed溢出
+        float dV_project(math::constrain(SP_speed__delta * AtoB_vector.normalized(),-20.0f, 20.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_speed溢出
+
+
+        //新增新的速度控制方法,将速度差量直接加在测量的空速上.
+        //kp推荐 值为0.1,kd暂时保持0
+        float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_project + _kd * dV_project;
+
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 纵差距: %.0f米, 速度差: %.0fm/s",_vehicle_status.system_id,double(dL_project),double(dV_project));
+        //    mavlink_log_info(&_mavlink_log_pub, "%d号 速度目标: %.0fm/s",_vehicle_status.system_id,double(airspeed_follow_sp));
+
+
+        _att_sp.air_follow_sp = airspeed_follow_sp;
+        _att_sp.air_speed_2d  = air_speed_2d.length();
+        _att_sp.air_dL_project    = dL_project;
+        _att_sp.air_dV_project    = dV_project;
+
+
+        //    float throttle_follow_refer = mission_throttle;
+
+        //从机超前时稍微提高目标高度
+        float surpass_DL = 0.0f;
+        if((PtoPsp_distance.length() < 30.0f && dL_project < -5.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
+            surpass_DL = _surpass_dl;
         }
 
-        L_MPtoSP = {0.0f, L_space * (sys_id-1)};
+
+        //待办,给飞机增加高度处理程序,现在飞机在天上高度严重不一致.
+        //待办,给飞机增加获得定位时报高度的程序,方便外场操作
+        //待办,当某个飞机超出控制精度,需要降高度避险时,需要地面站发出声音
+
+        /******************************************* 这部分进行横向控制和修正 **************************************************************************/
+        float dL_PtoPsp_across = PtoPsp_distance % AtoB_vector.normalized();  //这个就是侧偏距
+        //开始横航向计算
+        //提取A点和B点坐标
+        Vector2f currB_sp = {float(PB_position_sp.lat), float(PB_position_sp.lon)};
+        Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
+        //放在这里主要是为了使用上面计算出来的侧偏距
+        _l1_control.navigate_followme(prevA_sp, currB_sp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
+        _att_sp.roll_body = _l1_control.nav_roll();
+        _att_sp.yaw_body = _l1_control.nav_bearing();
 
 
-        break;
-
-    case MP_position.FORMSHAPE_HORIZON1_and_VERTIAL1 :
-        if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换倾斜1字编队");
+        //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
+        if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
+            const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
+            if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
+                _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+            }
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-50.0f), radians(50.0f));  //限制范围
         }
-        L_MPtoSP = {-1.0f * L_space * (sys_id-1), L_space * (sys_id-1)};
 
-        break;
-    case MP_position.FORMSHAPE_VERTIAL1  :
-        if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换纵向1字编队");
+
+        //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
+        //这一段是使用水平距离判断是否需要进行降高度保护
+        float H_space = _H_space;
+
+        float juli_L = 6.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+        if((dL_project < 8.0f && dL_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
+            juli_L = H_space * float(sys_id-1);//加入编队,也有一定的安全间隔
         }
 
-        L_MPtoSP = {-1.0f * L_space * (sys_id-1) ,0.0f};
+        float follow_alt_sp = max(MP_position_filter.alt - juli_L + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
 
-        break;
-    case MP_position.FORMSHAPE_VERTIAL1_and_RHOMBUS4  :
-        if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#菱形 纵向 过渡编队");
+        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%3.0f 横%3.0f 速差%3.0f",
+                                            _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
+
+        //待办,注意限制主机在编队时的转弯半径,目前是通过限制主机滚转角小于20度的方式限制,此时2号机能跟随,但是其他从机不确定能否正常跟随.20190622
+        //待办,为了提高从机的响应速度,是否要给飞机增加姿态环的信息传输
+
+        tecs_update_pitch_throttle(follow_alt_sp,
+                                   calculate_target_airspeed(airspeed_follow_sp),
+                                   radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
+                                   radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
+                                   _parameters.throttle_min,
+                                   _parameters.throttle_max,
+                                   mission_throttle,
+                                   false,
+                                   radians(_parameters.pitch_limit_min));
+
+
+
+        hrt_abstime now_utc_time3 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
+
+
+        if(0){
+
+            //待办:打印输出非常占用时间,调试好就取消
+            //待办,改成用遥控器控制,这一段输出要人为控制
+
+            //    mavlink_log_info(&_mavlink_log_pub, "#%d号传输超时",_vehicle_status.system_id);
+
+
+            if(INFO_enable_1s) PX4_INFO("MP_position          .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position.alt),MP_position.lat,MP_position.lon,double(MP_position.vx),double(MP_position.vy));
+            if(INFO_enable_1s) PX4_INFO("MP_position_filter   .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter.alt),MP_position_filter.lat,MP_position_filter.lon,double(MP_position_filter.vx),double(MP_position_filter.vy));
+            if(INFO_enable_1s) PX4_INFO("SP_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_position_sp.alt),SP_position_sp.lat,SP_position_sp.lon,double(SP_position_sp.vx),double(SP_position_sp.vy));
+            if(INFO_enable_1s) PX4_INFO("SP_global_pos        .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_global_pos.alt),SP_global_pos.lat,SP_global_pos.lon,double(SP_global_pos.vel_n),double(SP_global_pos.vel_e));
+            if(INFO_enable_1s) PX4_INFO("PB_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PB_position_sp.alt),PB_position_sp.lat,PB_position_sp.lon,double(PB_position_sp.vx),double(PB_position_sp.vy));
+            if(INFO_enable_1s) PX4_INFO("PA_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PA_position_sp.alt),PA_position_sp.lat,PA_position_sp.lon,double(PA_position_sp.vx),double(PA_position_sp.vy));
+
+
+
+            if(INFO_enable_1s) PX4_INFO("                      currB_sp    lat:\t%8.5f lon:\t%8.5f",double(currB_sp(0)),double(currB_sp(1)));
+            if(INFO_enable_1s) PX4_INFO("                      prevA_sp    lat:\t%8.5f lon:\t%8.5f",double(prevA_sp(0)),double(prevA_sp(1)));
+            if(INFO_enable_1s) PX4_INFO("                      curr_pos    lat:\t%8.5f lon:\t%8.5f",double(curr_pos(0)),double(curr_pos(1)));
+            if(INFO_enable_1s) PX4_INFO("                                             nav_speed_2d vx:\t%4.2f vy:\t%4.2f",double(nav_speed_2d(0)),double(nav_speed_2d(1)));
+
+            if(INFO_enable_1s) PX4_INFO("   MP_position_filter.alt:\t%4.2f airspeed_follow_sp:\t%2.4f",double(MP_position_filter.alt),double(airspeed_follow_sp));
+
+
+
+
+
+
+            if(INFO_enable_1s) PX4_INFO("bear_P2Psp_P1v = %.2f",double(bear_P2Psp_P1v));
+
+
+
+            if(INFO_enable_1s) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(airspeed_follow_sp),double(dL_project),double(dV_project));
+
+
+
+
+
+            hrt_abstime now_utc_time4 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
+
+            if(INFO_enable_1s) PX4_INFO("使用延时s:%.2f",double(dt_utc_s));
+
+
+            float dt_utc_s1 = (now_utc_time1-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+            float dt_utc_s2 = (now_utc_time2-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+            float dt_utc_s3 = (now_utc_time3-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+            float dt_utc_s4 = (now_utc_time4-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+
+
+            //总延时=传输时+程序时A    ,程序时B是这个程序段的运行时间
+            if(INFO_enable_1s) PX4_INFO("第0延时s:%.3f 第1延时s:%.3f 第2延时s:%.3f 第3延时s:%.3f 第4延时s:%.3f",double(dt_utc_s0),double(dt_utc_s1),double(dt_utc_s2),double(dt_utc_s3),double(dt_utc_s4));
+
+
+
         }
 
-        L_MPtoSP(0) = -1.0f * L_space * (sys_id-1);                     //纵向坐标
-        L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;  //横向坐标
 
-
-        break;
-    case MP_position.FORMSHAPE_RHOMBUS4  :
-        if(_form_shape_last != _form_shape_current){
-            mavlink_log_info(&_mavlink_log_pub,"#转换菱形4机编队");
-        }
-        L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;//纵向坐标
-        L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;//横向坐标
-
-        break;
-    }
-    _form_shape_last = _form_shape_current; //记录上面状态机的值
-
-    //把两架飞机之间的水平距离转换为地理坐标系下的差距，下一步好根据这个差距计算从机的位置指令
-    matrix::Vector2f L_MPtoSP_ned = bodytoNED(L_MPtoSP,MP_gndspd_ned,MP_position_filter.yaw);
-
-    float L_spacePB{80.0f};//2.0f * _navigator->get_acceptance_radius());  // B点到从机目标位置的距离,默认大于L1距离
-    float L_spacePA{0.0f};  //A点到从机目标位置的距离,这个距离不宜太大
-    matrix::Vector2f offset_PB_ned = bodytoNED({L_spacePB         , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PB方向为正
-    matrix::Vector2f offset_PA_ned = bodytoNED({-1.0f * L_spacePA , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PA方向为负
-
-    //获得从机GPS位置信息
-    bool vehicle_gps_position_updated;
-    static vehicle_gps_position_s SP_gps_pos;
-    orb_check(_vehicle_gps_position_sub, &vehicle_gps_position_updated);
-    if (vehicle_gps_position_updated) {
-        orb_copy(ORB_ID(vehicle_gps_position), _vehicle_gps_position_sub, &SP_gps_pos);
-    }
-    //获得从机global位置信息
-    bool vehicle_global_position_updated;
-    static int _vehicle_global_position_sub = orb_subscribe(ORB_ID(vehicle_global_position));
-    static vehicle_global_position_s SP_global_pos{};
-    orb_check(_vehicle_global_position_sub, &vehicle_global_position_updated);
-    if (vehicle_global_position_updated) {
-        orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &SP_global_pos);
-    }
-    Vector2f curr_pos = {float(SP_global_pos.lat),float(SP_global_pos.lon)};  //初始化从机位置向量
-
-
-    hrt_abstime now_utc_time0 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-    float dt_utc_s0 = (now_utc_time0-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
-    float dt_utc_s = dt_utc_s0;
-
-    static int times_mavlink = 9;
-    if(dt_utc_s>0.3f){//说明此时主机数据传输有较大延时,此数据不能作为预测使用
-        if(times_mavlink % 10 == 0){
-           if(INFO_enable_1s) mavlink_and_console_log_info(&_mavlink_log_pub, "#%d超时%.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
-//           if(INFO_enable1s) PX4_INFO("超时dt_utc_s: %.2f pos_sp_curr.timestamp=%.0f",double(dt_utc_s),double(pos_sp_curr.timestamp))  ;
-        }
-        times_mavlink ++;
-        dt_utc_s = 0.1f;//避免延时问题,更改为平均值
     } else {
-        times_mavlink = 9;
-    }
-    //这一段计算在时间差内的位移,并且应用到主机位置上
 
-//    Vector2f MP_deltaL = dt_utc_s * MP_speed;  //主机在传输时间差内的位移 单位m
-
-
-    hrt_abstime now_utc_time1 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-    hrt_abstime now_time1 = hrt_absolute_time();
-
-
-/***********************下面是新方法计算从机目标点\A\B点的速度***********************/
-
-    //下面这段代码主要是NED坐标系和全球坐标系之间的转换，map_projection_init函数的意思就是当前这个经度纬度视为（0,0）原点。
-    //map_projection_reproject函数在原点基础上 偏移一个（x,y）后的经度纬度是多少，这样就可以根据两个点之间地理坐标系的差距 计算出另外一个点的全球坐标系
-    //当然与之对应的 还有一个是已知B点的全球坐标系 可以映射求出B点的地理坐标系
-    //
-    //编队目的，下面已知主机和从机的地理坐标系上编队的差距，知道主机的位置 如何求从机的位置经度纬度？
-    //那就把主机位置映射成原点，加上地理坐标系上的偏移后，求出从机的经度纬度。函数重要重要是地理坐标系和全球坐标系之间的转换，主要注意的是初始化谁是原点（0,0）
-
-//    dt_utc_s = 0.0f; //调试
-
-    Vector2f L_MPtoPA_ned = L_MPtoSP_ned + offset_PA_ned;
-    Vector2f L_MPtoPB_ned = L_MPtoSP_ned + offset_PB_ned;
-
-    //计算SP点
-    static follow_target_s SP_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
-    follow_target_s SP_position_sp{};
-    Vector2f SP_speed_sp;
-    cal_relat_lapse_position(
-                MP_position_filter,
-                L_MPtoSP_ned,
-                SP_position_sp,
-                dt_utc_s,
-                SP_speed_sp,
-                SP_position_sp_prev);
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 SP位置: %.0f",_vehicle_status.system_id,double(SP_position_sp.lat *1e7));
-
-    //计算PA点
-    static follow_target_s PA_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
-    follow_target_s PA_position_sp{};
-    Vector2f PA_speed_sp;
-    cal_relat_lapse_position(
-                MP_position_filter,
-                L_MPtoPA_ned,
-                PA_position_sp,
-                dt_utc_s,
-                PA_speed_sp,
-                PA_position_sp_prev);
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 PA位置: %.0f",_vehicle_status.system_id,double(PA_position_sp.lat *1e7));
-
-    //计算PB点
-    static follow_target_s PB_position_sp_prev{}; //这个参数用来保存下面计算平均速度函数中的前一个位置;
-    follow_target_s PB_position_sp{};
-    Vector2f PB_speed_sp;
-    cal_relat_lapse_position(
-                MP_position_filter,
-                L_MPtoPB_ned,
-                PB_position_sp,
-                dt_utc_s,
-                PB_speed_sp,
-                PB_position_sp_prev);
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 PB位置: %.0f",_vehicle_status.system_id,double(PB_position_sp.lat *1e7));
-
-/***********************上面是新方法计算从机目标点\A\B点的速度***********************/
-
-    hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-    hrt_abstime now_time2 = hrt_absolute_time();
-    hrt_abstime D_now_times = now_time2 - now_time1;
-    D_now_times =D_now_times ;//调试使用
-//mavlink_log_info(&_mavlink_log_pub, "%d号 D_now_times: %.0f",_vehicle_status.system_id,double(D_now_times));
-
-
-    /******************************************* 这部分进行纵向控制 **************************************************************************/
-
-    //计算位置差
-    static Vector2f PtoPsp_distance{}; //从机实际位置P到从机目标位置Psp之间的距离向量
-    get_vector_to_next_waypoint(SP_global_pos.lat,SP_global_pos.lon,SP_position_sp.lat,SP_position_sp.lon,
-                                &PtoPsp_distance(0),&PtoPsp_distance(1));
-    //计算速度差
-    Vector2f SP_speed = {SP_global_pos.vel_n,SP_global_pos.vel_e};
-    Vector2f SP_speed__delta = SP_speed_sp - SP_speed;  //从机目标地速减去从机实际地速
-
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 SP Dspd: %.0f",_vehicle_status.system_id,double(SP_speed__delta(0)));
-
-
-    //从机实际航向 与 从机目标航向的角度差
-    float bear_P2Psp_P1v = math::degrees(atan2f(PtoPsp_distance % SP_speed_sp,PtoPsp_distance * SP_speed_sp));
-
-    //计算从机的航线方向角,就是从A点指向B点的方向
-//    //先获得主机的实际航向角
-//    Vector2f yaw_norm = {float(cos(double(MP_position_filter.yaw))),float(sin(double(MP_position_filter.yaw)))};
-
-
-    static Vector2f AtoB_vector{};
-    get_vector_to_next_waypoint(PA_position_sp.lat,PA_position_sp.lon,PB_position_sp.lat,PB_position_sp.lon,
-                                &AtoB_vector(0),&AtoB_vector(1));
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 AtoB_vector(0): %.0f米",_vehicle_status.system_id,double(AtoB_vector(0)));
-
-
-    //待办:在飞行或高速运动的时候务必确认以下以上两个向量的角度,先飞主机看看
-    //待办:在地面上调好飞机的距离响应和反馈,务必确认好速度的反馈
-
-    //待办:这部分速度投影的处理还需要再优化,后期可以根据从机到编队的距离来判断,当距离非常大时不使用投影,距离很小时使用投影.或者根据从机到主机的方位来判断.
-    //计算在从机目标速度上的投影
-    float dL_project(math::constrain(PtoPsp_distance * AtoB_vector.normalized(),-20.0f, 20.0f)); //注意将距离差向量投影到主机速度向量上 ,加限幅是为了防止SP_speed溢出
-    float dV_project(math::constrain(SP_speed__delta * AtoB_vector.normalized(),-20.0f, 20.0f)); //将速度差向量投影到主机速度向量上 ,加限幅是为了防止SP_speed溢出
-
-
-     //新增新的速度控制方法,将速度差量直接加在测量的空速上.
-//kp推荐 值为0.1,kd暂时保持0
-    float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_project + _kd * dV_project;
-
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 纵差距: %.0f米, 速度差: %.0fm/s",_vehicle_status.system_id,double(dL_project),double(dV_project));
-//    mavlink_log_info(&_mavlink_log_pub, "%d号 速度目标: %.0fm/s",_vehicle_status.system_id,double(airspeed_follow_sp));
-
-
-    _att_sp.air_follow_sp = airspeed_follow_sp;
-    _att_sp.air_speed_2d  = air_speed_2d.length();
-    _att_sp.air_dL_project    = dL_project;
-    _att_sp.air_dV_project    = dV_project;
-
-
-//    float throttle_follow_refer = mission_throttle;
-
-    //从机超前时稍微提高目标高度
-    float surpass_DL = 0.0f;
-    if((PtoPsp_distance.length() < 30.0f && dL_project < -5.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
-        surpass_DL = _surpass_dl;
-    }
-
-
-    //待办,给飞机增加高度处理程序,现在飞机在天上高度严重不一致.
-    //待办,给飞机增加获得定位时报高度的程序,方便外场操作
-    //待办,当某个飞机超出控制精度,需要降高度避险时,需要地面站发出声音
-
-    /******************************************* 这部分进行横向控制和修正 **************************************************************************/
-    float dL_PtoPsp_across = PtoPsp_distance % AtoB_vector.normalized();  //这个就是侧偏距
-    //开始横航向计算
-//提取A点和B点坐标
-Vector2f currB_sp = {float(PB_position_sp.lat), float(PB_position_sp.lon)};
-Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
-    //放在这里主要是为了使用上面计算出来的侧偏距
-    _l1_control.navigate_followme(prevA_sp, currB_sp, curr_pos, nav_speed_2d);//使用目标航点的位置作为跟踪位置
-    _att_sp.roll_body = _l1_control.nav_roll();
-    _att_sp.yaw_body = _l1_control.nav_bearing();
-
-
-    //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
-    if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
-        if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
-            _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+        if(true){
+            //定时输出相同数据的数量
+            static uint times_equal = 1;
+            times_equal = times_equal + 1;
+            if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%d号相同数%.0f",_vehicle_status.system_id,double(times_equal));
         }
-        _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-50.0f), radians(50.0f));  //限制范围
     }
-
-
-    //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
-    //这一段是使用水平距离判断是否需要进行降高度保护
-    float H_space = _H_space;
-
-    float juli_L = 6.0f * float(sys_id-1);  //根据各机编号确定安全间隔
-    if((dL_project < 8.0f && dL_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
-        juli_L = H_space * float(sys_id-1);//加入编队,也有一定的安全间隔
-    }
-
-    float follow_alt_sp = max(MP_position_filter.alt - juli_L + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
-
-    if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%.0f 横%.0f 速差%.0f",
-    _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
-
-    //待办,注意限制主机在编队时的转弯半径,目前是通过限制主机滚转角小于20度的方式限制,此时2号机能跟随,但是其他从机不确定能否正常跟随.20190622
-    //待办,为了提高从机的响应速度,是否要给飞机增加姿态环的信息传输
-
-    tecs_update_pitch_throttle(follow_alt_sp,
-                               calculate_target_airspeed(airspeed_follow_sp),
-                               radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
-                               radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
-                               _parameters.throttle_min,
-                               _parameters.throttle_max,
-                               mission_throttle,
-                               false,
-                               radians(_parameters.pitch_limit_min));
-
-
-
-    hrt_abstime now_utc_time3 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-
-
-    if(0){
-
-        //待办:打印输出非常占用时间,调试好就取消
-        //待办,改成用遥控器控制,这一段输出要人为控制
-
-        //    mavlink_log_info(&_mavlink_log_pub, "#%d号传输超时",_vehicle_status.system_id);
-
-
-        if(INFO_enable_1s) PX4_INFO("MP_position          .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position.alt),MP_position.lat,MP_position.lon,double(MP_position.vx),double(MP_position.vy));
-        if(INFO_enable_1s) PX4_INFO("MP_position_filter   .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position_filter.alt),MP_position_filter.lat,MP_position_filter.lon,double(MP_position_filter.vx),double(MP_position_filter.vy));
-        if(INFO_enable_1s) PX4_INFO("SP_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_position_sp.alt),SP_position_sp.lat,SP_position_sp.lon,double(SP_position_sp.vx),double(SP_position_sp.vy));
-        if(INFO_enable_1s) PX4_INFO("SP_global_pos        .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(SP_global_pos.alt),SP_global_pos.lat,SP_global_pos.lon,double(SP_global_pos.vel_n),double(SP_global_pos.vel_e));
-        if(INFO_enable_1s) PX4_INFO("PB_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PB_position_sp.alt),PB_position_sp.lat,PB_position_sp.lon,double(PB_position_sp.vx),double(PB_position_sp.vy));
-        if(INFO_enable_1s) PX4_INFO("PA_position_sp       .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(PA_position_sp.alt),PA_position_sp.lat,PA_position_sp.lon,double(PA_position_sp.vx),double(PA_position_sp.vy));
-
-
-
-        if(INFO_enable_1s) PX4_INFO("                      currB_sp    lat:\t%8.5f lon:\t%8.5f",double(currB_sp(0)),double(currB_sp(1)));
-        if(INFO_enable_1s) PX4_INFO("                      prevA_sp    lat:\t%8.5f lon:\t%8.5f",double(prevA_sp(0)),double(prevA_sp(1)));
-        if(INFO_enable_1s) PX4_INFO("                      curr_pos    lat:\t%8.5f lon:\t%8.5f",double(curr_pos(0)),double(curr_pos(1)));
-        if(INFO_enable_1s) PX4_INFO("                                             nav_speed_2d vx:\t%4.2f vy:\t%4.2f",double(nav_speed_2d(0)),double(nav_speed_2d(1)));
-
-        if(INFO_enable_1s) PX4_INFO("   MP_position_filter.alt:\t%4.2f airspeed_follow_sp:\t%2.4f",double(MP_position_filter.alt),double(airspeed_follow_sp));
-
-
-
-
-
-
-        if(INFO_enable_1s) PX4_INFO("bear_P2Psp_P1v = %.2f",double(bear_P2Psp_P1v));
-
-
-
-        if(INFO_enable_1s) PX4_INFO("设置空速m/s:%.1f 距离差m:%.1f 速度差m/s:%.1f",double(airspeed_follow_sp),double(dL_project),double(dV_project));
-
-
-
-
-
-        hrt_abstime now_utc_time4 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-
-        if(INFO_enable_1s) PX4_INFO("使用延时s:%.2f",double(dt_utc_s));
-
-
-        float dt_utc_s1 = (now_utc_time1-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
-        float dt_utc_s2 = (now_utc_time2-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
-        float dt_utc_s3 = (now_utc_time3-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
-        float dt_utc_s4 = (now_utc_time4-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
-
-
-        //总延时=传输时+程序时A    ,程序时B是这个程序段的运行时间
-        if(INFO_enable_1s) PX4_INFO("第0延时s:%.3f 第1延时s:%.3f 第2延时s:%.3f 第3延时s:%.3f 第4延时s:%.3f",double(dt_utc_s0),double(dt_utc_s1),double(dt_utc_s2),double(dt_utc_s3),double(dt_utc_s4));
-
-
-
-    }
-
-
-
-
-
-
 
 }
 

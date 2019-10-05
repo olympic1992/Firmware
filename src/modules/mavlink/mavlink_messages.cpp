@@ -4191,7 +4191,7 @@ protected:
         _vehicle_status_sub->update(&status);
         if(status.system_id==mainplaneID) {
 
-//            PX4_INFO("status.system_id: %d ",status.system_id);
+            //            PX4_INFO("status.system_id: %d ",status.system_id);
             //ID为1说明是主机,不是主机时不发送编队信息
 
             mavlink_formationx_t msg = {};
@@ -4200,33 +4200,58 @@ protected:
             vehicle_global_position_s globalpos = {};
             vehicle_gps_position_s gpspos = {};
 
-            if (_gpspos_sub->update(&gpspos)) {
-                _globalpos_sub->update(&globalpos);
-                updated = true;
-                //这里暂不使用global定位的时间,因为global时间会受其他传感器的融合状态影响
-                msg.time_usec = gpspos.time_utc_usec ;//+ (globalpos.timestamp - gpspos.timestamp);  //传递主机GPS数据的UTC时间
+            if(1){   //调试,这一段使用目前的代码
+                if (_gpspos_sub->update(&gpspos)) {
+                    _globalpos_sub->update(&globalpos);
+                    updated = true;
+                    //这里暂不使用global定位的时间,因为global时间会受其他传感器的融合状态影响
+                    msg.time_usec = gpspos.time_utc_usec ;//+ (globalpos.timestamp - gpspos.timestamp);  //传递主机GPS数据的UTC时间
 
 
-                //                msg.seq = _sequence++;
-                //                msg.target_system = 0; // All systems
-                //                msg.target_component = 0; // All components
+                    //                msg.seq = _sequence++;
+                    //                msg.target_system = 0; // All systems
+                    //                msg.target_component = 0; // All components
 
-                //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
-                msg.lat = gpspos.lat;
-                msg.lon = gpspos.lon;
+                    //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
+                    msg.lat = gpspos.lat;
+                    msg.lon = gpspos.lon;
 
-                msg.alt = globalpos.alt;
-                msg.yaw_body = globalpos.yaw;   //主机的偏航角也要发给从机,当主机地速很小时使用主机机头指向.
+                    msg.alt = globalpos.alt;
+                    msg.yaw_body = globalpos.yaw;   //主机的偏航角也要发给从机,当主机地速很小时使用主机机头指向.
 
-                //                msg.vx = gpspos.vel_n;
-                //                msg.vy = gpspos.vel_e;
-                //                msg.vz = gpspos.vel_d;
+                    //                msg.vx = gpspos.vel_n;
+                    //                msg.vy = gpspos.vel_e;
+                    //                msg.vz = gpspos.vel_d;
 
 
-                // 待办:           这里预留发送编队控制命令的位置,使用formuorb的内容
-                formationx_s formuorb = {};
-                _formationx_sub->update(&formuorb);
-                msg.formshape_id = formuorb.formshape_id;
+                    // 待办:           这里预留发送编队控制命令的位置,使用formuorb的内容
+                    formationx_s formuorb = {};
+                    _formationx_sub->update(&formuorb);
+                    msg.formshape_id = formuorb.formshape_id;
+
+                }
+            } else {  //调试,这一段使用新的代码,使用global位置
+
+                if (_globalpos_sub->update(&globalpos)) {
+
+                    updated = true;
+                    //这里使用global定位的时间
+                    msg.time_usec = gpspos.time_utc_usec + (globalpos.timestamp - gpspos.timestamp);  //传递主机GPS数据的UTC时间
+
+                    //整理主机的实际位置/速度/偏航角,作为从机目标位置的依据
+                    msg.lat = globalpos.lat;
+                    msg.lon = globalpos.lon;
+
+                    msg.alt = globalpos.alt;
+                    msg.yaw_body = globalpos.yaw;   //主机的偏航角也要发给从机,当主机地速很小时使用主机机头指向.
+
+
+                    // 待办:           这里预留发送编队控制命令的位置,使用formuorb的内容
+                    formationx_s formuorb = {};
+                    _formationx_sub->update(&formuorb);
+                    msg.formshape_id = formuorb.formshape_id;
+
+                }
 
             }
 

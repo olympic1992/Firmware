@@ -494,9 +494,9 @@ Vector2f Psp2A_offset_ned{};
 
 void cal_mean_spd(const follow_target_s &P_position_sp,follow_target_s &P_position_prev,Vector2f &P_gndspd_ned);
 void cal_relative_position(
-        const follow_target_s &MP_position_filter,
-        const Vector2f &L_MPtoP_ned,
-        follow_target_s &P_relative_dL);
+        const follow_target_s &P_initial,
+        const Vector2f &L_P1toP2_ned,
+        follow_target_s &P_relative);
 
 void cal_relat_lapse_position(
         const follow_target_s &MP_position_filter,
