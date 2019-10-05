@@ -68,6 +68,7 @@ FixedwingPositionControl::FixedwingPositionControl() :
 
     _parameter_handles.land_slope_angle = param_find("FW_LND_ANG");
     _parameter_handles.form_kp = param_find("FORM_KP");
+    _parameter_handles.form_ki = param_find("FORM_KI");
     _parameter_handles.form_kd = param_find("FORM_KD");
     _parameter_handles.form_K_MP_smooth = param_find("FORM_K_MP_SMOOTH");
     _parameter_handles.form_surpass_dl = param_find("FORM_SURPASS_DL");
@@ -261,6 +262,7 @@ FixedwingPositionControl::parameters_update()
     param_get(_parameter_handles.land_slope_angle, &land_slope_angle);
 
     param_get(_parameter_handles.form_kp, &_kp);
+    param_get(_parameter_handles.form_ki, &_ki);
     param_get(_parameter_handles.form_kd, &_kd);
     param_get(_parameter_handles.form_K_MP_smooth, &_K_MP_smooth);
     param_get(_parameter_handles.form_surpass_dl, &_surpass_dl);
@@ -1595,7 +1597,21 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         //新增新的速度控制方法,将速度差量直接加在测量的空速上.
         //kp推荐 值为0.1,kd暂时保持0
-        float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_project + _kd * dV_project;
+
+        //计算积分值
+        static float L_integrator(0.0f);
+        float L_integrator_max = 5.0f;
+        L_integrator = math::constrain(L_integrator + dL_project * _ki, - L_integrator_max, L_integrator_max);
+        //按时间清除积分
+        static hrt_abstime last_integrated_time = 0;
+        if(hrt_elapsed_time(&last_integrated_time) * 1e-6 > 1.0){ //与上次的运行时间间隔大于1秒
+            last_integrated_time = hrt_absolute_time();
+            L_integrator = 0.0f;
+        }
+
+
+
+        float airspeed_follow_sp = _parameters.airspeed_trim + _kp * dL_project + L_integrator + _kd * dV_project ;
 
         //    mavlink_log_info(&_mavlink_log_pub, "%d号 纵差距: %.0f米, 速度差: %.0fm/s",_vehicle_status.system_id,double(dL_project),double(dV_project));
         //    mavlink_log_info(&_mavlink_log_pub, "%d号 速度目标: %.0fm/s",_vehicle_status.system_id,double(airspeed_follow_sp));

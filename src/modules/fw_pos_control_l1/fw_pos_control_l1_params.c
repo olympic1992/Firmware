@@ -268,6 +268,18 @@ PARAM_DEFINE_FLOAT(FW_LND_ANG, 5.0f);
 PARAM_DEFINE_FLOAT(FORM_KP, 0.3f);
 
 /**
+ * FORM_KI
+ *
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.01
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FORM_KI, 0.0f);
+
+
+/**
  * FORM_KD
  *
  * @min 0.0
