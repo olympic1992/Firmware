@@ -466,15 +466,15 @@ void FormationControl::run()
 
                 //待办:在这里增加编队队形控制的命令语句
 
-                if(check_aux3_enable_follow()){
-                    P1_send.formshape_id = P1_send_target.FORMSHAPE_RHOMBUS4;
-                    //                 mavlink_log_info(&_mavlink_log_pub,"#主机菱形4机编队");
-                }else{
-                    P1_send.formshape_id = P1_send_target.FORMSHAPE_VERTIAL1;
-                    //                    mavlink_log_info(&_mavlink_log_pub,"#主机竖直1字编队");
-                }
+//                if(check_aux3_enable_follow()){
+//                    P1_send.formshape_id = P1_send_target.FORMSHAPE_RHOMBUS4;
+//                    //                 mavlink_log_info(&_mavlink_log_pub,"#主机菱形4机编队");
+//                }else{
+//                    P1_send.formshape_id = P1_send_target.FORMSHAPE_VERTIAL1;
+//                    //                    mavlink_log_info(&_mavlink_log_pub,"#主机竖直1字编队");
+//                }
 
-                formationx_sp_publish();  //将主机数据推送到主机的uorb总线上,然后由mavlink发送出去
+//                formationx_sp_publish();  //将主机数据推送到主机的uorb总线上,然后由mavlink发送出去
                 usleep(10000);//每一句都要延时,防止不能上传航线
 
             } else if((sys_id <= 4 && sys_id >= 1)){ //说明当前飞机是从机,并且遥控器上的编队开关启用了,此时要根据从机编号做相应操作

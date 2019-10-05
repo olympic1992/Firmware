@@ -1327,7 +1327,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     //对主机位置进行滤波
-    static float _responsiveness = 0.01f;
+    static float _responsiveness = 0.01f * _temp;
     static follow_target_s MP_position_filter{};
     if(MP_position_filter.timestamp == 0){
         MP_position_filter = MP_position;
@@ -1340,6 +1340,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 //    MP_position_filter.timestamp = hrt_absolute_time();//调试
 //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
+   //  mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_responsiveness));
+
 
     //这一段用来求平均速度
     Vector2f MP_gndspd_ned;
@@ -1568,7 +1570,7 @@ D_now_times =D_now_times ;//调试使用
 
 
      //新增新的速度控制方法,将速度差量直接加在测量的空速上.
-
+//kp推荐 值为0.1,kd暂时保持0
     float airspeed_follow_sp = air_speed_2d.length() + _kp * dL_project + _kd * dV_project;
 
 //    mavlink_log_info(&_mavlink_log_pub, "%d号 纵差距: %.0f米, 速度差: %.0fm/s",_vehicle_status.system_id,double(dL_project),double(dV_project));
@@ -1608,7 +1610,7 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
 
     //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
     if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        const float rectify_L_range = 1.5f;  //超过这个距离值,就会启用强制纠偏算法
+        const float rectify_L_range = 2.0f;  //超过这个距离值,就会启用强制纠偏算法
         if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
             _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
 
