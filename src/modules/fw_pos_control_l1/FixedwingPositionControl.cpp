@@ -70,6 +70,7 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.form_kp = param_find("FORM_KP");
     _parameter_handles.form_kd = param_find("FORM_KD");
     _parameter_handles.form_temp = param_find("FORMA_PARAM3");
+    _parameter_handles.form_type = param_find("FORM_TYPE");
     _parameter_handles.land_H1_virt = param_find("FW_LND_HVIRT");
     _parameter_handles.land_flare_alt_relative = param_find("FW_LND_FLALT");
     _parameter_handles.land_flare_pitch_min_deg = param_find("FW_LND_FL_PMIN");
@@ -259,6 +260,7 @@ FixedwingPositionControl::parameters_update()
     param_get(_parameter_handles.form_kp, &_kp);
     param_get(_parameter_handles.form_kd, &_kd);
     param_get(_parameter_handles.form_temp, &_temp);
+    param_get(_parameter_handles.form_type, &_type);
 
     float land_flare_alt_relative = 0.0f;
     param_get(_parameter_handles.land_flare_alt_relative, &land_flare_alt_relative);
@@ -564,6 +566,27 @@ FixedwingPositionControl::fw_pos_ctrl_status_publish()
     } else {
         _fw_pos_ctrl_status_pub = orb_advertise(ORB_ID(fw_pos_ctrl_status), &_fw_pos_ctrl_status);
     }
+}
+
+void
+FixedwingPositionControl::form_type_publish(){
+
+            if((_type>=0)&&(_type<=2)){
+
+                _formation.timestamp = hrt_absolute_time();
+                _formation.formshape_id=_type;
+                if (_formation_pub != nullptr) {
+                    orb_publish(ORB_ID(formationx), _formation_pub, &_formation);
+                   mavlink_log_info(&_mavlink_log_pub,"切换队形%d ",_formation.formshape_id);
+
+                } else {
+                    _formation_pub = orb_advertise(ORB_ID(formationx), &_formation);
+                }
+
+            }
+            else{
+                  mavlink_log_info(&_mavlink_log_pub,"队形输入错误");
+            }
 }
 
 void
@@ -1585,7 +1608,7 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
 
     //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
     if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
+        const float rectify_L_range = 1.5f;  //超过这个距离值,就会启用强制纠偏算法
         if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
             _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
 
@@ -2249,7 +2272,12 @@ FixedwingPositionControl::run()
             orb_copy(ORB_ID(parameter_update), _params_sub, &update);
 
             /* update parameters from storage */
-            parameters_update();
+            _type_pre=_type;//保存队形指令 地面站队形指令有变换才切
+             parameters_update();
+             if(_type_pre!=_type){//地面站队形指令有变换才切
+                 form_type_publish();
+             }
+
         }
 
         /* only run controller if position changed */

@@ -93,6 +93,7 @@
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/follow_target.h>
 #include <uORB/topics/home_position.h>
+#include <uORB/topics/formationx.h>
 
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
@@ -184,6 +185,7 @@ private:
     orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
     orb_advert_t	_tecs_status_pub{nullptr};		///< TECS status publication */
     orb_advert_t	_fw_pos_ctrl_status_pub{nullptr};	///< navigation capabilities publication */
+    orb_advert_t	_formation_pub{nullptr};
 
     orb_id_t _attitude_setpoint_id{nullptr};
 
@@ -198,6 +200,7 @@ private:
     vehicle_local_position_s	_local_pos {};			///< vehicle local position */
     vehicle_land_detected_s		_vehicle_land_detected {};	///< vehicle land detected */
     vehicle_status_s		_vehicle_status {};		///< vehicle status */
+    formationx_s  _formation {};
 
 
 
@@ -256,6 +259,8 @@ Vector2f Psp2A_offset_ned{};
     float _kp{1.0f};
     float _kd{1.0f};
     float _temp{0.0f};
+    int   _type{2};
+    int   _type_pre{2};
 
     bool _was_in_air{false};				///< indicated wether the plane was in the air in the previous interation*/
     hrt_abstime _time_went_in_air{0};			///< time at which the plane went in the air */
@@ -393,6 +398,7 @@ Vector2f Psp2A_offset_ned{};
         param_t form_kp;
         param_t form_kd;
         param_t form_temp;
+        param_t form_type;
         param_t land_H1_virt;
         param_t land_flare_alt_relative;
         param_t land_thrust_lim_alt_relative;
@@ -425,6 +431,7 @@ Vector2f Psp2A_offset_ned{};
 
     // publish navigation capabilities
     void		fw_pos_ctrl_status_publish();
+    void		form_type_publish();
 
     /**
      * Get a new waypoint based on heading and distance from current position

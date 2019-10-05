@@ -292,6 +292,18 @@ PARAM_DEFINE_FLOAT(FORM_KD, 1.0f);
  */
 PARAM_DEFINE_FLOAT(FORMA_PARAM3, 1.0f);
 
+
+/**
+ * 0 shuiping ; 1 shuzhi  ; 2 lingxing
+ *
+ * @unit deg
+ * @min 0
+ * @max 2
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_INT32(FORM_TYPE, 2);
+
+
 /**
  *
  *
