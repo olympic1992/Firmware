@@ -256,9 +256,12 @@ Vector2f Psp2A_offset_ned{};
     float _flare_curve_alt_rel_last{0.0f};
     float _target_bearing{0.0f};				///< estimated height to ground at which flare started */
 
-    float _kp{1.0f};
-    float _kd{1.0f};
-    float _temp{0.0f};
+    float _kp{0.3f};
+    float _kd{0.0f};
+    float _K_MP_smooth{0.0f};
+    float _surpass_dl{0.0f};
+    float _H_space{5.0f};
+    float _L_space{10.0f};
     int   _type{2};
     int   _type_pre{2};
 
@@ -397,7 +400,10 @@ Vector2f Psp2A_offset_ned{};
         param_t land_slope_angle;
         param_t form_kp;
         param_t form_kd;
-        param_t form_temp;
+        param_t form_K_MP_smooth;
+        param_t form_surpass_dl;
+        param_t form_H_space;
+        param_t form_L_space;
         param_t form_type;
         param_t land_H1_virt;
         param_t land_flare_alt_relative;

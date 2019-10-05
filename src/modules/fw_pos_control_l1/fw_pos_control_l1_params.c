@@ -257,41 +257,73 @@ PARAM_DEFINE_FLOAT(FW_CLMBOUT_DIFF, 10.0f);
 PARAM_DEFINE_FLOAT(FW_LND_ANG, 5.0f);
 
 /**
- * Landing slope angle
+ * FORM_KP
  *
- * @unit deg
- * @min 1.0
- * @max 15.0
+ * @min 0.0
+ * @max 0.6
  * @decimal 1
- * @increment 0.5
+ * @increment 0.1
  * @group FW L1 Control
  */
-PARAM_DEFINE_FLOAT(FORM_KP, 1.0f);
+PARAM_DEFINE_FLOAT(FORM_KP, 0.3f);
 
 /**
- * Landing slope angle
+ * FORM_KD
  *
- * @unit deg
- * @min 1.0
- * @max 15.0
+ * @min 0.0
+ * @max 0.5
  * @decimal 1
- * @increment 0.5
+ * @increment 0.1
  * @group FW L1 Control
  */
-PARAM_DEFINE_FLOAT(FORM_KD, 1.0f);
+PARAM_DEFINE_FLOAT(FORM_KD, 0.0f);
 
 /**
- * Landing slope angle
+ * FORM_K_MP_SMOOTH
  *
- * @unit deg
- * @min 1.0
+ * @min 0.0
+ * @max 60.0
+ * @decimal 0
+ * @increment 1
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FORM_K_MP_SMOOTH, 10.0f);
+
+/**
+ * FORM_SURPASS_DL
+ *
+ * @unit m
+ * @min 0.0
  * @max 15.0
  * @decimal 1
  * @increment 0.5
  * @group FW L1 Control
  */
-PARAM_DEFINE_FLOAT(FORMA_PARAM3, 1.0f);
+PARAM_DEFINE_FLOAT(FORM_SURPASS_DL, 0.0f);
 
+/**
+ * FORM_H_SPACE
+ *
+ * @unit m
+ * @min 0.0
+ * @max 5.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FORM_H_SPACE, 5.0f);
+
+/**
+ * FORM_L_SPACE
+ *
+ * @unit m
+ * @min 5.0
+ * @max 20.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FORM_L_SPACE, 10.0f);
 
 /**
  * 0 shuiping ; 1 shuzhi  ; 2 lingxing

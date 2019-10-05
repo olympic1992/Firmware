@@ -69,7 +69,10 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.land_slope_angle = param_find("FW_LND_ANG");
     _parameter_handles.form_kp = param_find("FORM_KP");
     _parameter_handles.form_kd = param_find("FORM_KD");
-    _parameter_handles.form_temp = param_find("FORMA_PARAM3");
+    _parameter_handles.form_K_MP_smooth = param_find("FORM_K_MP_SMOOTH");
+    _parameter_handles.form_surpass_dl = param_find("FORM_SURPASS_DL");
+    _parameter_handles.form_H_space = param_find("FORM_H_SPACE");
+    _parameter_handles.form_L_space = param_find("FORM_L_SPACE");
     _parameter_handles.form_type = param_find("FORM_TYPE");
     _parameter_handles.land_H1_virt = param_find("FW_LND_HVIRT");
     _parameter_handles.land_flare_alt_relative = param_find("FW_LND_FLALT");
@@ -259,7 +262,10 @@ FixedwingPositionControl::parameters_update()
 
     param_get(_parameter_handles.form_kp, &_kp);
     param_get(_parameter_handles.form_kd, &_kd);
-    param_get(_parameter_handles.form_temp, &_temp);
+    param_get(_parameter_handles.form_K_MP_smooth, &_K_MP_smooth);
+    param_get(_parameter_handles.form_surpass_dl, &_surpass_dl);
+    param_get(_parameter_handles.form_H_space, &_H_space);
+    param_get(_parameter_handles.form_L_space, &_L_space);
     param_get(_parameter_handles.form_type, &_type);
 
     float land_flare_alt_relative = 0.0f;
@@ -1327,7 +1333,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
     //对主机位置进行滤波
-    static float _responsiveness = 0.01f * _temp;
+    float _responsiveness = 0.01f * _K_MP_smooth;
     static follow_target_s MP_position_filter{};
     if(MP_position_filter.timestamp == 0){
         MP_position_filter = MP_position;
@@ -1340,7 +1346,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 //    MP_position_filter.timestamp = hrt_absolute_time();//调试
 //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
-//     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_temp));
+//     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_K_MP_smooth));
 
 
     //这一段用来求平均速度
@@ -1370,7 +1376,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                                                       {-2, 0}  // 4号机位置,主机后面
                                                };
 
-    float L_space(10.0f);  //编队飞机之间的间距
+    float L_space = _L_space;  //编队飞机之间的间距
 
     matrix::Vector2f L_MPtoSP = {L_space,L_space}; //从机相对主机的偏移距离向量,主机地轴航向作为x轴正方向,主机右侧是y正方向
     uint8_t sys_id = _vehicle_status.system_id;
@@ -1527,9 +1533,9 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 /***********************上面是新方法计算从机目标点\A\B点的速度***********************/
 
     hrt_abstime now_utc_time2 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-hrt_abstime now_time2 = hrt_absolute_time();
-hrt_abstime D_now_times = now_time2 - now_time1;
-D_now_times =D_now_times ;//调试使用
+    hrt_abstime now_time2 = hrt_absolute_time();
+    hrt_abstime D_now_times = now_time2 - now_time1;
+    D_now_times =D_now_times ;//调试使用
 //mavlink_log_info(&_mavlink_log_pub, "%d号 D_now_times: %.0f",_vehicle_status.system_id,double(D_now_times));
 
 
@@ -1586,9 +1592,9 @@ D_now_times =D_now_times ;//调试使用
 //    float throttle_follow_refer = mission_throttle;
 
     //从机超前时稍微提高目标高度
-    float chaosu_L = 0.0f;
-    if((PtoPsp_distance.length() < 30.0f && dL_project < -7.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
-        chaosu_L = 0.0f;
+    float surpass_DL = 0.0f;
+    if((PtoPsp_distance.length() < 30.0f && dL_project < -5.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
+        surpass_DL = _surpass_dl;
     }
 
 
@@ -1610,10 +1616,9 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
 
     //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
     if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-        const float rectify_L_range = 2.0f;  //超过这个距离值,就会启用强制纠偏算法
+        const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
         if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
             _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
-
         }
         _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-50.0f), radians(50.0f));  //限制范围
     }
@@ -1621,14 +1626,17 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
 
     //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
     //这一段是使用水平距离判断是否需要进行降高度保护
-    float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+    float H_space = _H_space;
+
+    float juli_L = 6.0f * float(sys_id-1);  //根据各机编号确定安全间隔
     if((dL_project < 8.0f && dL_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
-        juli_L = 4.0f * float(sys_id-1);//加入编队,也有一定的安全间隔
+        juli_L = H_space * float(sys_id-1);//加入编队,也有一定的安全间隔
     }
 
-    float follow_alt_sp = max(MP_position_filter.alt - juli_L + chaosu_L, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
+    float follow_alt_sp = max(MP_position_filter.alt - juli_L + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
 
-    if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%.0f 横%.0f 速差%.0f",_vehicle_status.system_id,double(dL_project),double(PtoPsp_distance % AtoB_vector.normalized()),double(dV_project));
+    if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%.0f 横%.0f 速差%.0f",
+    _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
 
     //待办,注意限制主机在编队时的转弯半径,目前是通过限制主机滚转角小于20度的方式限制,此时2号机能跟随,但是其他从机不确定能否正常跟随.20190622
     //待办,为了提高从机的响应速度,是否要给飞机增加姿态环的信息传输
