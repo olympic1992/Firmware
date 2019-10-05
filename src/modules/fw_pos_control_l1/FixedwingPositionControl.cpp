@@ -1340,7 +1340,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 //    MP_position_filter.timestamp = hrt_absolute_time();//调试
 //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
-   //  mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_responsiveness));
+    mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_responsiveness));
 
 
     //这一段用来求平均速度
