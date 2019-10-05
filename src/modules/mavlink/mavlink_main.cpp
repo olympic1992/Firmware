@@ -2018,59 +2018,59 @@ Mavlink::task_main(int argc, char *argv[])
 	switch (_mode) {
     case MAVLINK_MODE_NORMAL:   //使用数传接到radio上时一般用这个模式
         printf("MAVLINK_MODE_NORMAL \n");
-        configure_stream("ADSB_VEHICLE");
+        //configure_stream("ADSB_VEHICLE");
         configure_stream("ALTITUDE", 1.0f);
         configure_stream("ATTITUDE", 2.0f);
         configure_stream("ATTITUDE_TARGET", 2.0f);
-        configure_stream("CAMERA_IMAGE_CAPTURED");
-        configure_stream("COLLISION");
-        configure_stream("DEBUG", 1.0f);
-        configure_stream("DEBUG_VECT", 1.0f);
+       // configure_stream("CAMERA_IMAGE_CAPTURED");
+       // configure_stream("COLLISION");
+        //configure_stream("DEBUG", 1.0f);
+       // configure_stream("DEBUG_VECT", 1.0f);
 //        configure_stream("DISTANCE_SENSOR", 0.5f);
         configure_stream("ESTIMATOR_STATUS", 0.5f);
         configure_stream("EXTENDED_SYS_STATE", 1.0f);
         configure_stream("GLOBAL_POSITION_INT", 1.0f);
         configure_stream("GPS_RAW_INT", 1.0f);
 /*        configure_stream("HIGHRES_IMU", 1.5f);  */
-        configure_stream("HOME_POSITION", 0.5f);
+        configure_stream("HOME_POSITION", 0.2f);
         configure_stream("LOCAL_POSITION_NED", 1.0f);
-        configure_stream("NAMED_VALUE_FLOAT", 1.0f);
+        //configure_stream("NAMED_VALUE_FLOAT", 1.0f);
         configure_stream("NAV_CONTROLLER_OUTPUT", 1.0f);
-        configure_stream("OPTICAL_FLOW_RAD", 1.0f);
+        //configure_stream("OPTICAL_FLOW_RAD", 1.0f);
         configure_stream("PING", 0.1f);
-        configure_stream("POSITION_TARGET_LOCAL_NED", 1.0f);
+        //configure_stream("POSITION_TARGET_LOCAL_NED", 1.0f);
         configure_stream("POSITION_TARGET_GLOBAL_INT", 1.0f);
         configure_stream("RC_CHANNELS", 1.0f);
         configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
         configure_stream("SYS_STATUS", 1.0f);
-        configure_stream("VFR_HUD", 1.0f);
-        configure_stream("VISION_POSITION_ESTIMATE", 1.0f);
+        //configure_stream("VFR_HUD", 1.0f);
+       // configure_stream("VISION_POSITION_ESTIMATE", 1.0f);
         configure_stream("WIND_COV", 0.5f);
 
         break;
 
     case MAVLINK_MODE_ONBOARD:  //使用companion时会进入这一模式,设置第二数传进入这个模式
-        printf("MAVLINK_MODE_ONBOARD \n");
+//        printf("MAVLINK_MODE_ONBOARD \n");
         configure_stream("FORMATIONX", 25.0f);
         configure_stream("PING", 0.2f);
         break;
 
 	case MAVLINK_MODE_OSD:
-        printf("MAVLINK_MODE_OSD \n");
-        configure_stream("ALTITUDE", 1.0f);
-        configure_stream("ATTITUDE", 25.0f);
-        configure_stream("ATTITUDE_TARGET", 10.0f);
-        configure_stream("ESTIMATOR_STATUS", 1.0f);
-        configure_stream("EXTENDED_SYS_STATE", 1.0f);
-        configure_stream("GLOBAL_POSITION_INT", 10.0f);
-        configure_stream("GPS_RAW_INT", 1.0f);
-        configure_stream("HOME_POSITION", 0.5f);
-        configure_stream("RC_CHANNELS", 5.0f);
-        configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
-        configure_stream("SYS_STATUS", 5.0f);
-        configure_stream("SYSTEM_TIME", 1.0f);
-        configure_stream("VFR_HUD", 25.0f);
-        configure_stream("WIND_COV", 2.0f);
+//        printf("MAVLINK_MODE_OSD \n");
+//        configure_stream("ALTITUDE", 1.0f);
+//        configure_stream("ATTITUDE", 25.0f);
+//        configure_stream("ATTITUDE_TARGET", 10.0f);
+//        configure_stream("ESTIMATOR_STATUS", 1.0f);
+//        configure_stream("EXTENDED_SYS_STATE", 1.0f);
+//        configure_stream("GLOBAL_POSITION_INT", 10.0f);
+//        configure_stream("GPS_RAW_INT", 1.0f);
+//        configure_stream("HOME_POSITION", 0.5f);
+//        configure_stream("RC_CHANNELS", 5.0f);
+//        configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
+//        configure_stream("SYS_STATUS", 5.0f);
+//        configure_stream("SYSTEM_TIME", 1.0f);
+//        configure_stream("VFR_HUD", 25.0f);
+//        configure_stream("WIND_COV", 2.0f);
         break;
 
 	case MAVLINK_MODE_MAGIC:
@@ -2121,17 +2121,17 @@ Mavlink::task_main(int argc, char *argv[])
 		break;
 
 	case MAVLINK_MODE_MINIMAL:
-        printf("MAVLINK_MODE_MINIMAL \n");
-        configure_stream("ALTITUDE", 0.5f);
-        configure_stream("ATTITUDE", 10.0f);
-        configure_stream("EXTENDED_SYS_STATE", 0.1f);
-        configure_stream("GPS_RAW_INT", 0.5f);
-        configure_stream("GLOBAL_POSITION_INT", 5.0f);
-        configure_stream("HOME_POSITION", 0.1f);
-        configure_stream("NAMED_VALUE_FLOAT", 1.0f);
-        configure_stream("RC_CHANNELS", 0.5f);
-        configure_stream("SYS_STATUS", 0.1f);
-        configure_stream("VFR_HUD", 1.0f);
+//        printf("MAVLINK_MODE_MINIMAL \n");
+//        configure_stream("ALTITUDE", 0.5f);
+//        configure_stream("ATTITUDE", 10.0f);
+//        configure_stream("EXTENDED_SYS_STATE", 0.1f);
+//        configure_stream("GPS_RAW_INT", 0.5f);
+//        configure_stream("GLOBAL_POSITION_INT", 5.0f);
+//        configure_stream("HOME_POSITION", 0.1f);
+//        configure_stream("NAMED_VALUE_FLOAT", 1.0f);
+//        configure_stream("RC_CHANNELS", 0.5f);
+//        configure_stream("SYS_STATUS", 0.1f);
+//        configure_stream("VFR_HUD", 1.0f);
         break;
 
 	default:

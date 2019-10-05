@@ -123,7 +123,7 @@ static bool magnometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &sta
 	if (!h.isValid()) {
 		if (!optional) {
 			if (report_fail) {
-                mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: NO MAG SENSOR #%u", status.system_id,instance);
+                mavlink_log_critical(mavlink_log_pub, "%d号故障: NO MAG SENSOR #%u", status.system_id,instance);
 			}
 		}
 		present = false;
@@ -135,7 +135,7 @@ static bool magnometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &sta
 
 	if (ret) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: MAG #%u UNCALIBRATED", status.system_id,instance);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: MAG #%u UNCALIBRATED", status.system_id,instance);
 		}
 
 		success = false;
@@ -146,7 +146,7 @@ static bool magnometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &sta
 
 	if (ret != OK) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: MAG #%u SELFTEST FAILED", status.system_id,instance);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: MAG #%u SELFTEST FAILED", status.system_id,instance);
 		}
 
 		success = false;
@@ -180,7 +180,7 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	if (sensors.accel_inconsistency_m_s_s > test_limit) {
 		if (report_status) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: ACCELS INCONSISTENT - CHECK CAL",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障:ACCELS INCONSISTENT 要校准.",status.system_id);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, status);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false, status);
 		}
@@ -189,7 +189,7 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	} else if (sensors.accel_inconsistency_m_s_s > test_limit * 0.8f) {
 		if (report_status) {
-            mavlink_log_info(mavlink_log_pub, "%d号PREFLIGHT ADVICE: ACCELS INCONSISTENT - CHECK CAL",status.system_id);
+            mavlink_log_info(mavlink_log_pub, "%d号PREFLIGHT ADVICE: ACCELS INCONSISTENT 要校准",status.system_id);
 		}
 	}
 
@@ -198,7 +198,7 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	if (sensors.gyro_inconsistency_rad_s > test_limit) {
 		if (report_status) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: GYROS INCONSISTENT - CHECK CAL",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: GYROS INCONSISTENT 要校准",status.system_id);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, status);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false, status);
 		}
@@ -208,7 +208,7 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	} else if (sensors.gyro_inconsistency_rad_s > test_limit * 0.5f) {
 		if (report_status) {
-            mavlink_log_info(mavlink_log_pub, "%d号PREFLIGHT ADVICE: GYROS INCONSISTENT - CHECK CAL",status.system_id);
+            mavlink_log_info(mavlink_log_pub, "%d号PREFLIGHT ADVICE: GYROS INCONSISTENT 要校准",status.system_id);
 		}
 	}
 
@@ -238,7 +238,7 @@ static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s 
 
 	if (sensors.mag_inconsistency_ga > test_limit) {
 		if (report_status) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障:磁传感器不一致,建议复位fmu或禁用内置磁力计",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障:罗盘不一致,校准或禁用内罗盘",status.system_id);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, status);
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, status);
 		}
@@ -262,7 +262,7 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 	if (!h.isValid()) {
 		if (!optional) {
 			if (report_fail) {
-                mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: NO ACCEL SENSOR #%u",status.system_id, instance);
+                mavlink_log_critical(mavlink_log_pub, "%d号故障: NO ACCEL SENSOR #%u",status.system_id, instance);
 			}
 		}
 		present = false;
@@ -274,7 +274,7 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 	if (ret) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: ACCEL #%u UNCALIBRATED",status.system_id, instance);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: ACCEL #%u UNCALIBRATED",status.system_id, instance);
 		}
 
 		success = false;
@@ -285,7 +285,7 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 	if (ret != OK) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: ACCEL #%u TEST FAILED: %d",status.system_id, instance, ret);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: ACCEL #%u TEST FAILED: %d",status.system_id, instance, ret);
 		}
 
 		success = false;
@@ -305,7 +305,7 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 			if (accel_magnitude < 4.0f || accel_magnitude > 15.0f /* m/s^2 */) {
 				if (report_fail) {
-                    mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: ACCEL RANGE, hold still on arming",status.system_id);
+                    mavlink_log_critical(mavlink_log_pub, "%d号故障: ACCEL RANGE, hold still on arming",status.system_id);
 				}
 
 				/* this is frickin' fatal */
@@ -315,7 +315,7 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 		} else {
 			if (report_fail) {
-                mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: ACCEL READ",status.system_id);
+                mavlink_log_critical(mavlink_log_pub, "%d号故障: ACCEL READ",status.system_id);
 			}
 
 			/* this is frickin' fatal */
@@ -348,7 +348,7 @@ static bool gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, u
 	if (!h.isValid()) {
 		if (!optional) {
 			if (report_fail) {
-                mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: NO GYRO SENSOR #%u",status.system_id, instance);
+                mavlink_log_critical(mavlink_log_pub, "%d号故障: NO GYRO SENSOR #%u",status.system_id, instance);
 			}
 		}
 		present = false;
@@ -360,7 +360,7 @@ static bool gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, u
 
 	if (ret) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: GYRO #%u UNCALIBRATED",status.system_id, instance);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: GYRO #%u UNCALIBRATED",status.system_id, instance);
 		}
 
 		success = false;
@@ -371,7 +371,7 @@ static bool gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, u
 
 	if (ret != OK) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: GYRO #%u SELFTEST FAILED",status.system_id, instance);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: GYRO #%u SELFTEST FAILED",status.system_id, instance);
 		}
 
 		success = false;
@@ -398,7 +398,7 @@ static bool baroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, u
 	if (!h.isValid()) {
 		if (!optional) {
 			if (report_fail) {
-                mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: NO BARO SENSOR #%u",status.system_id, instance);
+                mavlink_log_critical(mavlink_log_pub, "%d号故障: NO BARO SENSOR #%u",status.system_id, instance);
 			}
 		}
 		set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, false, !optional, false, status);
@@ -411,7 +411,7 @@ static bool baroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, u
 	// int ret = check_calibration(fd, "CAL_BARO%u_ID");
 
 	// if (ret) {
-    // 	mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: BARO #%u UNCALIBRATED",status.system_id, instance);
+    // 	mavlink_log_critical(mavlink_log_pub, "%d号故障: BARO #%u UNCALIBRATED",status.system_id, instance);
 	// 	success = false;
 	// 	goto out;
 	// }
@@ -436,7 +436,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &statu
 	if ((orb_copy(ORB_ID(differential_pressure), fd_diffpres, &differential_pressure) != PX4_OK) ||
 	    (hrt_elapsed_time(&differential_pressure.timestamp) > 1000000)) {
 		if (report_fail && !optional) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: AIRSPEED SENSOR MISSING",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: AIRSPEED SENSOR MISSING",status.system_id);
 		}
 		present = false;
 		success = false;
@@ -446,7 +446,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &statu
 	if ((orb_copy(ORB_ID(airspeed), fd_airspeed, &airspeed) != PX4_OK) ||
 	    (hrt_elapsed_time(&airspeed.timestamp) > 1000000)) {
 		if (report_fail && !optional) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: AIRSPEED SENSOR MISSING",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: AIRSPEED SENSOR MISSING",status.system_id);
 		}
 		present = false;
 		success = false;
@@ -461,7 +461,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &statu
 	 */
 	if (prearm && fabsf(airspeed.confidence) < 0.95f) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: AIRSPEED SENSOR STUCK",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: AIRSPEED SENSOR STUCK",status.system_id);
 		}
 		present = true;
 		success = false;
@@ -475,7 +475,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &statu
 	 */
 	if (fabsf(differential_pressure.differential_pressure_filtered_pa) > 15.0f && !prearm) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: CHECK AIRSPEED CAL OR PITOT",status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号空速异常,校准或检查管路.",status.system_id);
 		}
 		present = true;
 		success = false;
@@ -515,7 +515,7 @@ static bool powerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, 
 					success = false;
 
 					if (report_fail) {
-                        mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: Avionics power low: %6.2f Volt",status.system_id, (double)avionics_power_rail_voltage);
+                        mavlink_log_critical(mavlink_log_pub, "%d号故障: Avionics power low: %6.2f Volt",status.system_id, (double)avionics_power_rail_voltage);
 					}
 
 				} else if (avionics_power_rail_voltage < 4.9f) {
@@ -558,7 +558,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 	// Check if preflight check performed by estimator has failed
 	if (status.pre_flt_fail) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF INTERNAL CHECKS",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF INTERNAL CHECKS",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -570,7 +570,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 
 	if (status.hgt_test_ratio > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF HGT ERROR",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF HGT ERROR",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -582,7 +582,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 
 	if (status.vel_test_ratio > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF VEL ERROR",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF VEL ERROR",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -594,7 +594,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 
 	if (status.pos_test_ratio > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF HORIZ POS ERROR",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF HORIZ POS ERROR",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -606,7 +606,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 
 	if (status.mag_test_ratio > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF YAW ERROR",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF YAW ERROR",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -619,7 +619,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 	if (fabsf(status.states[13]) > test_limit || fabsf(status.states[14]) > test_limit
 	    || fabsf(status.states[15]) > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF HIGH IMU ACCEL BIAS",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF HIGH IMU ACCEL BIAS",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -632,7 +632,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 	if (fabsf(status.states[10]) > test_limit || fabsf(status.states[11]) > test_limit
 	    || fabsf(status.states[12]) > test_limit) {
 		if (report_fail) {
-            mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF HIGH IMU GYRO BIAS",vehicle_status.system_id);
+            mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF HIGH IMU GYRO BIAS",vehicle_status.system_id);
 		}
 
 		success = false;
@@ -648,11 +648,11 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 			// The EKF is not using GPS
 			if (ekf_gps_check_fail) {
 				// Poor GPS quality is the likely cause
-                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: GPS QUALITY POOR",vehicle_status.system_id);
+                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号故障: GPS QUALITY POOR",vehicle_status.system_id);
 				gps_success = false;
 			} else {
 				// Likely cause unknown
-                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: EKF NOT USING GPS",vehicle_status.system_id);
+                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号故障: EKF NOT USING GPS",vehicle_status.system_id);
 				gps_success = false;
 				gps_present = false;
 			}
@@ -669,7 +669,7 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_s
 						  + (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_SPD_ERR))) > 0);
 
 			if (gps_quality_fail) {
-                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号飞前检查故障: GPS QUALITY POOR",vehicle_status.system_id);
+                if (report_fail) mavlink_log_critical(mavlink_log_pub, "%d号故障: GPS QUALITY POOR",vehicle_status.system_id);
 				gps_success = false;
 				success = false;
 				goto out;

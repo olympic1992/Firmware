@@ -448,8 +448,6 @@ void FormationControl::run()
         if ((fds[0].revents & POLLIN) != 0) {
 
             if(debug_enable){
-
-
                 sleep(1);
                 //以下程序用来获得定位后报高度
                 //获得从机GPS位置信息
@@ -468,10 +466,7 @@ void FormationControl::run()
                     orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &P_global_pos);
                 }
 
-
-                mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号有定位,gps高%.0f米,估计高度%.1f米",sys_id,double(P_gps_pos.alt),double(P_global_pos.alt));
-
-
+                mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号有定位,gps %.0f米.global %.0f米.",sys_id,double(P_gps_pos.alt * 1e-3),double(P_global_pos.alt));
 
 
 

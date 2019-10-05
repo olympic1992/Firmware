@@ -571,13 +571,13 @@ FixedwingPositionControl::fw_pos_ctrl_status_publish()
 void
 FixedwingPositionControl::form_type_publish(){
 
-            if((_type>=0)&&(_type<=2)){
+            if((_type==1)||(_type==2)||(_type==3)||(_type==12)||(_type==23)){
 
                 _formation.timestamp = hrt_absolute_time();
                 _formation.formshape_id=_type;
                 if (_formation_pub != nullptr) {
                     orb_publish(ORB_ID(formationx), _formation_pub, &_formation);
-                   mavlink_log_info(&_mavlink_log_pub,"切换队形%d ",_formation.formshape_id);
+                   mavlink_log_info(&_mavlink_log_pub,"#切队%d ",_formation.formshape_id);
 
                 } else {
                     _formation_pub = orb_advertise(ORB_ID(formationx), &_formation);
@@ -585,7 +585,7 @@ FixedwingPositionControl::form_type_publish(){
 
             }
             else{
-                  mavlink_log_info(&_mavlink_log_pub,"队形输入错误");
+                  mavlink_log_info(&_mavlink_log_pub,"#队形错误");
             }
 }
 
@@ -1340,7 +1340,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 //    MP_position_filter.timestamp = hrt_absolute_time();//调试
 //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
-    mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_responsiveness));
+//     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_temp));
 
 
     //这一段用来求平均速度
@@ -1623,10 +1623,10 @@ Vector2f prevA_sp = {float(PA_position_sp.lat), float(PA_position_sp.lon)};
     //这一段是使用水平距离判断是否需要进行降高度保护
     float juli_L = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
     if((dL_project < 8.0f && dL_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
-        juli_L = 2.0f * float(sys_id-1);//加入编队,也有一定的安全间隔
+        juli_L = 4.0f * float(sys_id-1);//加入编队,也有一定的安全间隔
     }
 
-    float follow_alt_sp = max(MP_position_filter.alt - juli_L + chaosu_L, pos_sp_curr.home_alt + 70.0f);//_home_pos.alt + 100.0f;
+    float follow_alt_sp = max(MP_position_filter.alt - juli_L + chaosu_L, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
 
     if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%.0f 横%.0f 速差%.0f",_vehicle_status.system_id,double(dL_project),double(PtoPsp_distance % AtoB_vector.normalized()),double(dV_project));
 
@@ -2274,11 +2274,11 @@ FixedwingPositionControl::run()
             orb_copy(ORB_ID(parameter_update), _params_sub, &update);
 
             /* update parameters from storage */
-            _type_pre=_type;//保存队形指令 地面站队形指令有变换才切
+            //_type_pre=_type;//保存队形指令 地面站队形指令有变换才切
              parameters_update();
-             if(_type_pre!=_type){//地面站队形指令有变换才切
+             //if(_type_pre!=_type){//地面站队形指令有变换才切
                  form_type_publish();
-             }
+            // }
 
         }
 
