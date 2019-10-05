@@ -1437,8 +1437,8 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         //把两架飞机之间的水平距离转换为地理坐标系下的差距，下一步好根据这个差距计算从机的位置指令
         matrix::Vector2f L_MPtoSP_ned = bodytoNED(L_MPtoSP,MP_gndspd_ned,MP_position_filter.yaw);
 
-        float L_spacePB{80.0f};//2.0f * _navigator->get_acceptance_radius());  // B点到从机目标位置的距离,默认大于L1距离
-        float L_spacePA{0.0f};  //A点到从机目标位置的距离,这个距离不宜太大
+        float L_spacePB{80.0f};//2.0f * _navigator->get_acceptance_radius());  // B点到从机目标位置的距离,距离要大,防止飞机过冲后触发掉头算法.
+        float L_spacePA{30.0f};  //A点到从机目标位置的距离,这个距离要大,让飞机从编队后面进入
         matrix::Vector2f offset_PB_ned = bodytoNED({L_spacePB         , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PB方向为正
         matrix::Vector2f offset_PA_ned = bodytoNED({-1.0f * L_spacePA , 0.0f},MP_gndspd_ned,MP_position_filter.yaw);  //PA方向为负
 
@@ -1650,7 +1650,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
         if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-            const float rectify_L_range = 1.0f;  //超过这个距离值,就会启用强制纠偏算法
+            const float rectify_L_range = 1.5f;  //超过这个距离值,就会启用强制纠偏算法
             if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
                 _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
             }
@@ -1660,14 +1660,12 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
         //这一段是使用水平距离判断是否需要进行降高度保护
-        float H_space = _H_space;
-
-        float juli_L = 6.0f * float(sys_id-1);  //根据各机编号确定安全间隔
+        float height_DL = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
         if((dL_project < 8.0f && dL_project > -4.0f) && (fabs(double(dL_PtoPsp_across)) < 8.0)){
-            juli_L = H_space * float(sys_id-1);//加入编队,也有一定的安全间隔
+            height_DL = _H_space * float(sys_id-1);//加入编队,也有一定的安全间隔
         }
 
-        float follow_alt_sp = max(MP_position_filter.alt - juli_L + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
+        float follow_alt_sp = max(MP_position_filter.alt - height_DL + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
 
         if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%3.0f 横%3.0f 速差%3.0f",
                                             _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
