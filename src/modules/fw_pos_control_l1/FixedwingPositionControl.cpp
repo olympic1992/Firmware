@@ -585,7 +585,7 @@ FixedwingPositionControl::form_type_publish(){
                 _formation.formshape_id=_type;
                 if (_formation_pub != nullptr) {
                     orb_publish(ORB_ID(formationx), _formation_pub, &_formation);
-                   mavlink_log_info(&_mavlink_log_pub,"#切队%d ",_formation.formshape_id);
+//                   mavlink_log_info(&_mavlink_log_pub,"#切队%d ",_formation.formshape_id);
 
                 } else {
                     _formation_pub = orb_advertise(ORB_ID(formationx), &_formation);
@@ -593,7 +593,7 @@ FixedwingPositionControl::form_type_publish(){
 
             }
             else{
-                  mavlink_log_info(&_mavlink_log_pub,"#队形错误");
+//                  mavlink_log_info(&_mavlink_log_pub,"有bug~队形错误");
             }
 }
 
@@ -1219,7 +1219,7 @@ void FixedwingPositionControl::cal_mean_spd(const follow_target_s &Position_sp,f
         Position_sp_prev = Position_sp;  //当第一次计算时,复位Position_sp_prev
     }else if (dt_ms >= 200.0f) {
         //调试打印
-        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%2MP dt %.0f",_vehicle_status.system_id,double(dt_ms));
+        mavlink_log_info(&_mavlink_log_pub, "%2MP dtms %.0f",_vehicle_status.system_id,double(dt_ms));
 
         // get last gps known reference for target
         static matrix::Vector3f P_position_delta3D{};
@@ -1302,24 +1302,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                                                 const Vector2f &air_speed_2d,const float mission_throttle,
                                                 const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
 {
-
-    //    mavlink_log_info(&_mavlink_log_pub,"位置 标记 4");
-    //控制输出频率
-    static uint64_t prevsend2time = 0;
-    float dt_send2time = hrt_elapsed_time(&prevsend2time) * 1e-6f;
-    prevsend2time = hrt_absolute_time();
-    float send2HZ = 1.0f / dt_send2time;
-    static uint64_t previnfo2time{0};
-    if((hrt_elapsed_time(&previnfo2time) * 1e-6f) > 1.0f){
-        previnfo2time = prevsend2time;
-        PX4_INFO("\n\n control_follow_target周期:%6.3fs 频率:%3.1fHz",double(dt_send2time),double(send2HZ));
-        //        mavlink_log_info(&_mavlink_log_pub,"#跟随位置控制");
-        INFO_enable_1s = true;
-    }
-
-
-    //    if(INFO_enable_1s) PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
-
+    // PX4_INFO(">>>>>>>>>>>>>>>> 运行 位置控制程序中的FOLLOW_TARGET  <<<<<<<<<<<<<<<<");
 
     //获得主机位置信息
     bool follow_target_updated = false;
@@ -1350,9 +1333,12 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         MP_position_filter.yaw = MP_position_filter.yaw *         _responsiveness + MP_position.yaw *         (1 - _responsiveness); //附加一个对高度的滤波
 
 
-        //    MP_position_filter.timestamp = hrt_absolute_time();//调试
-        //    MP_position_filter.lat =  hrt_absolute_time() * 1e-10 ;//调试
-        //     mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_K_MP_smooth));
+        /*****************有频率控制的调试输出******************/
+        static hrt_abstime prev_run_time1(0);
+        if((hrt_elapsed_time(&prev_run_time1) * 1e-6f) > 1.0f){
+            prev_run_time1 = hrt_absolute_time();
+            mavlink_log_info(&_mavlink_log_pub, "%d号 滤波: %.0f",_vehicle_status.system_id,double(_K_MP_smooth));    }
+        /*****************结束*******************************/
 
 
         //求主机平均速度
@@ -1361,21 +1347,13 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         cal_mean_spd(MP_position_filter,MP_position_filter_prev,MP_gndspd_ned);
 
 
-
-
-        //    mavlink_log_info(&_mavlink_log_pub, "%d号 M位置: %.0f",_vehicle_status.system_id,double(MP_position_filter.lat * 1e7));
-
-
-
         /*根据队形编号计算从机在编队中的相对位置*/
         //获取主机发来的队形编号
         static uint8_t _form_shape_current =  MP_position.FORMSHAPE_HORIZON1;
         _form_shape_current =  MP_position.formshape_id;
 
-        //    _form_shape_current =  MP_position.FORMSHAPE_VERTIAL1; //调试
 
         static uint8_t _form_shape_last = 0;
-
         static int FORMATION_rhombus4_axis[4][2] = {      //4机菱形编队的坐标集合,{主机地轴航向前后位置,左右位置}向前为正,向右为正
                                                           { 0, 0}, // 1号机位置(主机) 坐标原点
                                                           {-1, 1}, // 2号机位置,主机右边,后面
@@ -1394,8 +1372,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
             }
 
             L_MPtoSP = {0.0f, L_space * (sys_id-1)};
-
-
             break;
 
         case MP_position.FORMSHAPE_HORIZON1_and_VERTIAL1 :
@@ -1403,16 +1379,16 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
                 mavlink_log_info(&_mavlink_log_pub,"#转换倾斜1字编队");
             }
             L_MPtoSP = {-1.0f * L_space * (sys_id-1), L_space * (sys_id-1)};
-
             break;
+
         case MP_position.FORMSHAPE_VERTIAL1  :
             if(_form_shape_last != _form_shape_current){
                 mavlink_log_info(&_mavlink_log_pub,"#转换纵向1字编队");
             }
 
             L_MPtoSP = {-1.0f * L_space * (sys_id-1) ,0.0f};
-
             break;
+
         case MP_position.FORMSHAPE_VERTIAL1_and_RHOMBUS4  :
             if(_form_shape_last != _form_shape_current){
                 mavlink_log_info(&_mavlink_log_pub,"#菱形 纵向 过渡编队");
@@ -1420,17 +1396,16 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
             L_MPtoSP(0) = -1.0f * L_space * (sys_id-1);                     //纵向坐标
             L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;  //横向坐标
-
-
             break;
+
         case MP_position.FORMSHAPE_RHOMBUS4  :
             if(_form_shape_last != _form_shape_current){
                 mavlink_log_info(&_mavlink_log_pub,"#转换菱形4机编队");
             }
             L_MPtoSP(0) = FORMATION_rhombus4_axis[sys_id][0] * L_space;//纵向坐标
             L_MPtoSP(1) = FORMATION_rhombus4_axis[sys_id][1] * L_space;//横向坐标
-
             break;
+
         }
         _form_shape_last = _form_shape_current; //记录上面状态机的值
 
@@ -1460,28 +1435,32 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         Vector2f curr_pos = {float(SP_global_pos.lat),float(SP_global_pos.lon)};  //初始化从机位置向量
 
 
-        hrt_abstime now_utc_time0 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
-        float dt_utc_s0 = (now_utc_time0-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机本地时间到主机时间戳的时间差
+        hrt_abstime now_utc_time0 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);  //从机当前的utc时间
+        float dt_utc_s0 = (now_utc_time0-MP_position.timestamp) * 1e-6f;  //单位 秒 计算从机当前时间到主机时间戳的时间差
         float dt_utc_s = dt_utc_s0;
 
-        //调试打印
-        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%2MP dt_utc_s %.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
 
-
-        static int times_mavlink = 9;
-        if(dt_utc_s>0.25f){//说明此时主机数据传输有较大延时,此数据不能作为预测使用
-            if(times_mavlink % 10 == 0){
-                if(INFO_enable_1s) mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号超时%.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
-                //           if(INFO_enable1s) PX4_INFO("超时dt_utc_s: %.2f pos_sp_curr.timestamp=%.0f",double(dt_utc_s),double(pos_sp_curr.timestamp))  ;
-            }
-            times_mavlink ++;
-            dt_utc_s = 0.1f;//避免延时问题,更改为平均值
-        } else {
-            times_mavlink = 9;
+        /*****************有频率控制的调试输出******************/
+        static hrt_abstime prev_run_time4(0);
+        if((hrt_elapsed_time(&prev_run_time4) * 1e-6f) > 1.0f){
+            prev_run_time4 = hrt_absolute_time();
+            mavlink_log_info(&_mavlink_log_pub, "%2MP dt_utc_s %.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
         }
-        //这一段计算在时间差内的位移,并且应用到主机位置上
+        /*****************结束*******************************/
 
-        //    Vector2f MP_deltaL = dt_utc_s * MP_speed;  //主机在传输时间差内的位移 单位m
+
+
+        //监测传输超时
+        static hrt_abstime prev_run_time5(0);
+        if(dt_utc_s>0.25f){                  //说明此时主机数据传输有较大延时,此数据不能作为预测使用
+            //发现超时后,第一次直接输出消息,之后每一秒输出一次
+            if((hrt_elapsed_time(&prev_run_time5) * 1e-6f) > 1.0f) {
+                prev_run_time5 = hrt_absolute_time();
+                mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号超时%.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
+            }
+            dt_utc_s = 0.1f;//避免延时问题,更改为平均值
+        }
+
 
 
         hrt_abstime now_utc_time1 = SP_gps_pos.time_utc_usec + hrt_elapsed_time(&SP_gps_pos.timestamp);
@@ -1564,11 +1543,15 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         Vector2f SP_speed__delta = SP_speed_sp - SP_speed;  //从机目标地速减去从机实际地速
 
 
-        //调试打印
-        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "%d号速度 MP=%3.0f SPsp=%3.0f SPnow=%3.0f PA=%3.0f PB=%3.0f ",_vehicle_status.system_id,
-                                            double(MP_gndspd_ned.length()),double(SP_speed_sp.length()),double(SP_speed.length()),double(PA_speed_sp.length()),double(PB_speed_sp.length()));
 
-
+        /*****************有频率控制的调试输出******************/
+        static hrt_abstime prev_run_time3(0);
+        if((hrt_elapsed_time(&prev_run_time3) * 1e-6f) > 1.0f){
+            prev_run_time3 = hrt_absolute_time();
+            mavlink_log_info(&_mavlink_log_pub, "%d号速度 MP=%3.0f SPsp=%3.0f SPnow=%3.0f PA=%3.0f PB=%3.0f ",_vehicle_status.system_id,
+                             double(MP_gndspd_ned.length()),double(SP_speed_sp.length()),double(SP_speed.length()),double(PA_speed_sp.length()),double(PB_speed_sp.length()));
+        }
+        /*****************结束*******************************/
 
 
         //从机实际航向 与 从机目标航向的角度差
@@ -1612,10 +1595,14 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
 
         float airspeed_follow_sp = _parameters.airspeed_trim + _kp * dL_project + L_integrator + _kd * dV_project ;
-
-        //    mavlink_log_info(&_mavlink_log_pub, "%d号 纵差距: %.0f米, 速度差: %.0fm/s",_vehicle_status.system_id,double(dL_project),double(dV_project));
-        //    mavlink_log_info(&_mavlink_log_pub, "%d号 速度目标: %.0fm/s",_vehicle_status.system_id,double(airspeed_follow_sp));
-
+        /*****************有频率控制的调试输出******************/
+        static hrt_abstime prev_run_time7(0);
+        if((hrt_elapsed_time(&prev_run_time7) * 1e-6f) > 1.0f){
+            prev_run_time7 = hrt_absolute_time();
+            mavlink_log_info(&_mavlink_log_pub,"%d号 spd_sp:%3.0f spd_trim:%3.0f dL:%3.0f L_integ:%3.0f dV:%3.0f ",
+                             _vehicle_status.system_id,double(airspeed_follow_sp),double(_parameters.airspeed_trim),double(dL_project),double(L_integrator),double(dV_project));
+        }
+        /*****************结束*******************************/
 
         _att_sp.air_follow_sp = airspeed_follow_sp;
         _att_sp.air_speed_2d  = air_speed_2d.length();
@@ -1623,17 +1610,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         _att_sp.air_dV_project    = dV_project;
 
 
-        //    float throttle_follow_refer = mission_throttle;
-
-        //从机超前时稍微提高目标高度
-        float surpass_DL = 0.0f;
-        if((PtoPsp_distance.length() < 30.0f && dL_project < -5.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
-            surpass_DL = _surpass_dl;
-        }
-
-
         //待办,给飞机增加高度处理程序,现在飞机在天上高度严重不一致.
-        //待办,给飞机增加获得定位时报高度的程序,方便外场操作
         //待办,当某个飞机超出控制精度,需要降高度避险时,需要地面站发出声音
 
         /******************************************* 这部分进行横向控制和修正 **************************************************************************/
@@ -1658,6 +1635,12 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         }
 
 
+        /******************************************* 这部分 跟踪高度控制 **************************************************************************/
+        //从机超前时稍微提高目标高度
+        float surpass_DL = 0.0f;
+        if((PtoPsp_distance.length() < 30.0f && dL_project < -4.0f)){ //这里给了一个很宽的作用范围,防止飞机对头飞行时相撞
+            surpass_DL = _surpass_dl;
+        }
         //此功能是飞机在目标范围内时,加入编队高度层,注意,编队无高度差
         //这一段是使用水平距离判断是否需要进行降高度保护
         float height_DL = 5.0f * float(sys_id-1);  //根据各机编号确定安全间隔
@@ -1667,10 +1650,15 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         float follow_alt_sp = max(MP_position_filter.alt - height_DL + surpass_DL, pos_sp_curr.home_alt + 60.0f);//_home_pos.alt + 100.0f;
 
-        if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub,"%d号 纵%3.0f 横%3.0f 速差%3.0f",
-                                            _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
+        /*****************有频率控制的调试输出******************/
+        static hrt_abstime prev_run_time6(0);
+        if((hrt_elapsed_time(&prev_run_time6) * 1e-6f) > 1.0f){
+            prev_run_time6 = hrt_absolute_time();
+            mavlink_log_info(&_mavlink_log_pub,"%d号 纵%3.0f 横%3.0f 速差%3.0f",
+                             _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
+        }
+        /*****************结束*******************************/
 
-        //待办,注意限制主机在编队时的转弯半径,目前是通过限制主机滚转角小于20度的方式限制,此时2号机能跟随,但是其他从机不确定能否正常跟随.20190622
         //待办,为了提高从机的响应速度,是否要给飞机增加姿态环的信息传输
 
         tecs_update_pitch_throttle(follow_alt_sp,
@@ -1749,10 +1737,19 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
     } else {
 
         if(true){
-            //定时输出相同数据的数量
-            static uint times_equal = 1;
+
+
+            static uint times_equal(0);
             times_equal = times_equal + 1;
-            if(INFO_enable_1s) mavlink_log_info(&_mavlink_log_pub, "#%d号相同数%.0f",_vehicle_status.system_id,double(times_equal));
+
+            /*****************有频率控制的调试输出******************/
+            static hrt_abstime prev_run_time2(0);
+            if((hrt_elapsed_time(&prev_run_time2) * 1e-6f) > 1.0f){
+                prev_run_time2 = hrt_absolute_time();
+                mavlink_log_info(&_mavlink_log_pub, "#%d号相同数%.0f",_vehicle_status.system_id,double(times_equal));       }
+            /*****************结束*******************************/
+
+
         }
     }
 
