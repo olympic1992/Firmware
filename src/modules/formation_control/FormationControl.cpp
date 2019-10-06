@@ -433,7 +433,7 @@ void FormationControl::run()
                 mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号无定位",sys_id);
                 debug_enable = true;
             }
-            sleep(5);
+            sleep(30);
             continue;
         }
         if (poll_sp < 0) {  //严重错误

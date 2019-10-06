@@ -2024,8 +2024,8 @@ Mavlink::task_main(int argc, char *argv[])
         configure_stream("ATTITUDE_TARGET", 2.0f);
        // configure_stream("CAMERA_IMAGE_CAPTURED");
        // configure_stream("COLLISION");
-        //configure_stream("DEBUG", 1.0f);
-       // configure_stream("DEBUG_VECT", 1.0f);
+        configure_stream("DEBUG", 1.0f);
+        configure_stream("DEBUG_VECT", 1.0f);
 //        configure_stream("DISTANCE_SENSOR", 0.5f);
         configure_stream("ESTIMATOR_STATUS", 0.5f);
         configure_stream("EXTENDED_SYS_STATE", 1.0f);
@@ -2034,7 +2034,7 @@ Mavlink::task_main(int argc, char *argv[])
 /*        configure_stream("HIGHRES_IMU", 1.5f);  */
         configure_stream("HOME_POSITION", 0.2f);
         configure_stream("LOCAL_POSITION_NED", 1.0f);
-        //configure_stream("NAMED_VALUE_FLOAT", 1.0f);
+        configure_stream("NAMED_VALUE_FLOAT", 1.0f);
         configure_stream("NAV_CONTROLLER_OUTPUT", 1.0f);
         //configure_stream("OPTICAL_FLOW_RAD", 1.0f);
         configure_stream("PING", 0.1f);

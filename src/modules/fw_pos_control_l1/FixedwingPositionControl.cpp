@@ -578,23 +578,24 @@ FixedwingPositionControl::fw_pos_ctrl_status_publish()
 
 void
 FixedwingPositionControl::form_type_publish(){
+    static int _type_prev(0);
+    if(_type_prev != _type){
+        if((_type==1)||(_type==2)||(_type==3)||(_type==12)||(_type==23)){
+            _formation.timestamp = hrt_absolute_time();
+            _formation.formshape_id=_type;
+            if (_formation_pub != nullptr) {
+                orb_publish(ORB_ID(formationx), _formation_pub, &_formation);
+                mavlink_log_info(&_mavlink_log_pub,"#切队%d ",_formation.formshape_id);
 
-            if((_type==1)||(_type==2)||(_type==3)||(_type==12)||(_type==23)){
-
-                _formation.timestamp = hrt_absolute_time();
-                _formation.formshape_id=_type;
-                if (_formation_pub != nullptr) {
-                    orb_publish(ORB_ID(formationx), _formation_pub, &_formation);
-//                   mavlink_log_info(&_mavlink_log_pub,"#切队%d ",_formation.formshape_id);
-
-                } else {
-                    _formation_pub = orb_advertise(ORB_ID(formationx), &_formation);
-                }
-
+            } else {
+                _formation_pub = orb_advertise(ORB_ID(formationx), &_formation);
             }
-            else{
-//                  mavlink_log_info(&_mavlink_log_pub,"有bug~队形错误");
-            }
+        }
+        else{
+            mavlink_log_info(&_mavlink_log_pub,"不支持这个编号");
+        }
+        _type_prev = _type;
+    }
 }
 
 void
@@ -1219,7 +1220,7 @@ void FixedwingPositionControl::cal_mean_spd(const follow_target_s &Position_sp,f
         Position_sp_prev = Position_sp;  //当第一次计算时,复位Position_sp_prev
     }else if (dt_ms >= 200.0f) {
         //调试打印
-        mavlink_log_info(&_mavlink_log_pub, "%2MP dtms %.0f",_vehicle_status.system_id,double(dt_ms));
+//        mavlink_log_info(&_mavlink_log_pub, "%2d dtms %.0f",_vehicle_status.system_id,double(dt_ms));
 
         // get last gps known reference for target
         static matrix::Vector3f P_position_delta3D{};
@@ -1444,7 +1445,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         static hrt_abstime prev_run_time4(0);
         if((hrt_elapsed_time(&prev_run_time4) * 1e-6f) > 1.0f){
             prev_run_time4 = hrt_absolute_time();
-            mavlink_log_info(&_mavlink_log_pub, "%2MP dt_utc_s %.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
+            mavlink_log_info(&_mavlink_log_pub, "%d MP dt_utc_s %.0f",_vehicle_status.system_id,double(dt_utc_s * 1000.0f));
         }
         /*****************结束*******************************/
 
@@ -1548,7 +1549,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         static hrt_abstime prev_run_time3(0);
         if((hrt_elapsed_time(&prev_run_time3) * 1e-6f) > 1.0f){
             prev_run_time3 = hrt_absolute_time();
-            mavlink_log_info(&_mavlink_log_pub, "%d号速度 MP=%3.0f SPsp=%3.0f SPnow=%3.0f PA=%3.0f PB=%3.0f ",_vehicle_status.system_id,
+            mavlink_log_info(&_mavlink_log_pub, "%d号速度 MP=%.0f SPsp=%.0f SPnow=%.0f PA=%.0f PB=%.0f ",_vehicle_status.system_id,
                              double(MP_gndspd_ned.length()),double(SP_speed_sp.length()),double(SP_speed.length()),double(PA_speed_sp.length()),double(PB_speed_sp.length()));
         }
         /*****************结束*******************************/
@@ -1566,7 +1567,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         static Vector2f AtoB_vector{};
         get_vector_to_next_waypoint(PA_position_sp.lat,PA_position_sp.lon,PB_position_sp.lat,PB_position_sp.lon,
                                     &AtoB_vector(0),&AtoB_vector(1));
-        //    mavlink_log_info(&_mavlink_log_pub, "%d号 AtoB_vector(0): %.0f米",_vehicle_status.system_id,double(AtoB_vector(0)));
 
 
         //待办:在飞行或高速运动的时候务必确认以下以上两个向量的角度,先飞主机看看
@@ -1591,18 +1591,11 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
             last_integrated_time = hrt_absolute_time();
             L_integrator = 0.0f;
         }
+        last_integrated_time = hrt_absolute_time();
 
 
 
         float airspeed_follow_sp = _parameters.airspeed_trim + _kp * dL_project + L_integrator + _kd * dV_project ;
-        /*****************有频率控制的调试输出******************/
-        static hrt_abstime prev_run_time7(0);
-        if((hrt_elapsed_time(&prev_run_time7) * 1e-6f) > 1.0f){
-            prev_run_time7 = hrt_absolute_time();
-            mavlink_log_info(&_mavlink_log_pub,"%d号 spd_sp:%3.0f spd_trim:%3.0f dL:%3.0f L_integ:%3.0f dV:%3.0f ",
-                             _vehicle_status.system_id,double(airspeed_follow_sp),double(_parameters.airspeed_trim),double(dL_project),double(L_integrator),double(dV_project));
-        }
-        /*****************结束*******************************/
 
         _att_sp.air_follow_sp = airspeed_follow_sp;
         _att_sp.air_speed_2d  = air_speed_2d.length();
@@ -1627,7 +1620,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
         if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-            const float rectify_L_range = 1.5f;  //超过这个距离值,就会启用强制纠偏算法
+            const float rectify_L_range = 3.0f;  //超过这个距离值,就会启用强制纠偏算法
             if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
                 _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
             }
@@ -1654,8 +1647,9 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
         static hrt_abstime prev_run_time6(0);
         if((hrt_elapsed_time(&prev_run_time6) * 1e-6f) > 1.0f){
             prev_run_time6 = hrt_absolute_time();
-            mavlink_log_info(&_mavlink_log_pub,"%d号 纵%3.0f 横%3.0f 速差%3.0f",
-                             _vehicle_status.system_id,double(dL_project),double(dL_PtoPsp_across),double(dV_project));
+            mavlink_log_info(&_mavlink_log_pub,"%d机 横:%.0f 纵:%.0f 速差:%.0f L积分:%.0f 速sp:%.0f",
+                             _vehicle_status.system_id,double(dL_PtoPsp_across),double(dL_project),double(dV_project),
+                             double(L_integrator),double(airspeed_follow_sp));
         }
         /*****************结束*******************************/
 
@@ -1681,7 +1675,6 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
             //待办:打印输出非常占用时间,调试好就取消
             //待办,改成用遥控器控制,这一段输出要人为控制
 
-            //    mavlink_log_info(&_mavlink_log_pub, "#%d号传输超时",_vehicle_status.system_id);
 
 
             if(INFO_enable_1s) PX4_INFO("MP_position          .alt:\t%4.2f lat:\t%8.5f lon:\t%8.5f vx:\t%4.2f vy:\t%4.2f ",double(MP_position.alt),MP_position.lat,MP_position.lon,double(MP_position.vx),double(MP_position.vy));
@@ -1736,7 +1729,7 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
     } else {
 
-        if(true){
+        if(false){
 
 
             static uint times_equal(0);
@@ -2288,7 +2281,6 @@ FixedwingPositionControl::run()
 
 
     while (!should_exit()) {
-//    while(true){     sleep(1); mavlink_log_info(&_mavlink_log_pub,"位置控制运行1HZ 1 "); //调试
 
 //        if(0){ //调试
         /* wait for up to 500ms for data */
@@ -2378,8 +2370,6 @@ FixedwingPositionControl::run()
             //            if(INFO_enable_1s) PX4_INFO("_pos_sp_triplet.current.vx = %.1f",double(_pos_sp_triplet.current.vx));
 
 
-            //mavlink_log_info(&_mavlink_log_pub,"kp=%2.1f  kd=%2.1f ",(double)_kp,(double)_kd);
-//            mavlink_log_info(&_mavlink_log_pub,"位置 标记1 ");  //调试
 //       _pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;//调试
 
             if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current)) {
