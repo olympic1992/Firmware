@@ -477,6 +477,7 @@ void FormationControl::run()
 
 
 
+
             if (sys_id == mainplaneID) { //说明当前飞机是主机,执行主机相应操作
 
 
