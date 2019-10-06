@@ -4200,7 +4200,7 @@ protected:
             vehicle_global_position_s globalpos = {};
             vehicle_gps_position_s gpspos = {};
 
-            if(1){   //调试,这一段使用目前的代码
+            if(true){   //调试,这一段使用目前的代码
                 if (_gpspos_sub->update(&gpspos)) {
                     _globalpos_sub->update(&globalpos);
                     updated = true;

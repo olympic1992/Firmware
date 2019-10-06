@@ -408,16 +408,41 @@ void FormationControl::run()
         //ID 其他值是从机,从机接收主机的数据,根据编队队形计算相应的控制指令,然后进入offboard模式执行
 
         if((sys_id != mainplaneID)){//如果是从机
-             status_poll();  //获取飞行模式和飞机ID
-             if(nav_status == vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET) //切到了follow_target模式
-             {  
-                 enable_follow_target_mode(pub);//切换从机进入follow主机模式
-             }
-             else{
-                 pub=true;
-             }
+            status_poll();  //获取飞行模式和飞机ID
+            if(nav_status == vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET) //切到了follow_target模式
+            {
+                enable_follow_target_mode(pub);//切换从机进入follow主机模式
+            }
+            else{
+                pub=true;
+            }
             
             enable_follow_target_mode(check_aux1_enable_follow()); //这一段预留:使从机进入follow_target模式  //试验时,程序和遥控器共同实现
+
+
+            //这部分检测从机是否与主机通信
+            bool follow_target_updated = false;
+            static follow_target_s MP_position{};
+            orb_check(_follow_target_sub, &follow_target_updated);
+            static uint64_t MP_pos_timestamp_prev(0);
+            static uint64_t MP_pos_receive_time(0);
+            static uint64_t last_info_time(0);
+            if (follow_target_updated) {        //如果获得了目标更新
+                orb_copy(ORB_ID(follow_target), _follow_target_sub, &MP_position);
+                if(MP_position.timestamp != MP_pos_timestamp_prev){
+                    MP_pos_timestamp_prev = MP_position.timestamp;
+                    MP_pos_receive_time = hrt_absolute_time();
+                    last_info_time = 0;
+                }
+            }
+            if(hrt_elapsed_time(&MP_pos_receive_time) * 1e-6f > 1.0f){
+                if(hrt_elapsed_time(&last_info_time) * 1e-6f > 30.0f){
+                    last_info_time = hrt_absolute_time();
+                    mavlink_log_info(&_mavlink_log_pub,"#%d号断主机GPS",sys_id);
+                    mavlink_log_info(&_mavlink_log_pub,"     主机有GPS时说明主机从机断线");
+                }
+            }
+
 
         }
         //待办:注意,这部分仅处理编队命令
@@ -433,7 +458,7 @@ void FormationControl::run()
                 mavlink_and_console_log_info(&_mavlink_log_pub, "#%d号无定位",sys_id);
                 debug_enable = true;
             }
-            sleep(30);
+            sleep(10);
             continue;
         }
         if (poll_sp < 0) {  //严重错误
