@@ -263,6 +263,8 @@ Vector2f Psp2A_offset_ned{};
     float _surpass_dl{0.0f};
     float _H_space{5.0f};
     float _L_space{10.0f};
+    float _DL_X_range{2.0f};  //横向强制纠偏范围//超过这个距离值,就会启用强制纠偏算法//待办:把这个数字做成地面站参数,范围1~3.
+
     int   _type{2};
     int   _type_pre{2};
 
@@ -406,6 +408,7 @@ Vector2f Psp2A_offset_ned{};
         param_t form_surpass_dl;
         param_t form_H_space;
         param_t form_L_space;
+        param_t form_DL_X_range;
         param_t form_type;
         param_t land_H1_virt;
         param_t land_flare_alt_relative;

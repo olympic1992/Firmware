@@ -74,6 +74,7 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.form_surpass_dl = param_find("FORM_SURPASS_DL");
     _parameter_handles.form_H_space = param_find("FORM_H_SPACE");
     _parameter_handles.form_L_space = param_find("FORM_L_SPACE");
+    _parameter_handles.form_DL_X_range = param_find("FORM_DL_X_RANGE");
     _parameter_handles.form_type = param_find("FORM_TYPE");
     _parameter_handles.land_H1_virt = param_find("FW_LND_HVIRT");
     _parameter_handles.land_flare_alt_relative = param_find("FW_LND_FLALT");
@@ -268,6 +269,7 @@ FixedwingPositionControl::parameters_update()
     param_get(_parameter_handles.form_surpass_dl, &_surpass_dl);
     param_get(_parameter_handles.form_H_space, &_H_space);
     param_get(_parameter_handles.form_L_space, &_L_space);
+    param_get(_parameter_handles.form_DL_X_range, &_DL_X_range);
     param_get(_parameter_handles.form_type, &_type);
 
     float land_flare_alt_relative = 0.0f;
@@ -1620,9 +1622,9 @@ FixedwingPositionControl::control_follow_target(const Vector2f &nav_speed_2d,
 
         //如果飞机的侧偏距在一定范围内(需要同时满足以下条件),就启用强制纠偏
         if(dL_project < 15.0f && dL_project > -6.0f && fabs(double(dL_PtoPsp_across)) < 10.0){ //条件1
-            const float rectify_L_range = 3.0f;  //超过这个距离值,就会启用强制纠偏算法
-            if(float(fabs(double(dL_PtoPsp_across))) > rectify_L_range){ //条件2 //注意:这个值是1的时候是上次正常状态
-                _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/rectify_L_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
+//            float _DL_X_range = _DL_X_range;
+            if(float(fabs(double(dL_PtoPsp_across))) > _DL_X_range){ //条件2 //注意:这个值是1的时候是上次正常状态
+                _att_sp.roll_body = float(fabs(double(dL_PtoPsp_across * 1.0f/_DL_X_range))) * _att_sp.roll_body; //注意:这个值是5的时候是上次正常状态
             }
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-50.0f), radians(50.0f));  //限制范围
         }

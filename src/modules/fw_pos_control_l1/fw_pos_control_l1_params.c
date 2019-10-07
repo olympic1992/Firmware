@@ -338,6 +338,14 @@ PARAM_DEFINE_FLOAT(FORM_H_SPACE, 5.0f);
 PARAM_DEFINE_FLOAT(FORM_L_SPACE, 10.0f);
 
 /**
+ * FORM_DL_X_RANGE
+ *
+ * @unit m
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FORM_DL_X_RANGE, 2.0f);
+
+/**
  * 0 shuiping ; 1 shuzhi  ; 2 lingxing
  *
  * @unit deg
